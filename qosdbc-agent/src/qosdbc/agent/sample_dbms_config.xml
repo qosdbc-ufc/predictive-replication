@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+TYPE_POSTGRES = 1;
+TYPE_MYSQL = 2;
+-->
+
+<dbms_list>
+    <dbms_item>
+        <type>2</type>
+        <user>root</user>
+        <password>ufc123</password>
+    </dbms_item>
+</dbms_list>

@@ -234,15 +234,15 @@ public class QoSDBCTerminalServerThread extends Thread {
                                 statement.close();
                                 if (dbActiveReplica > 0) {
                                     result.setResultObject(result.getResultObject().toString() + "Update Catalog Information Success\n");
-                                    OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replic insert into db_active_replic " + "[OK]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                                    OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replica insertion into db_active_replica " + "[OK]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
                                 } else {
                                     result.setResultObject(result.getResultObject().toString() + "Update Catalog Information Failure\n");
-                                    OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replic insert into db_active_replic " + "[FAILURE]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                                    OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replica insertion into db_active_replica " + "[FAILURE]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
                                 }
                             } catch (SQLException ex) {
                                 System.out.println(ex.getMessage());
                                 result.setResultObject(result.getResultObject().toString() + "Update Catalog Information Failure\n");
-                                OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replic insert into db_active_replic " + "[FAILURE]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                                OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replica insert into db_active_replica " + "[FAILURE]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
                             }
                             /* Update database information in db_active and db_state - End */
 

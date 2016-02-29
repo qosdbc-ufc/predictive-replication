@@ -56,6 +56,9 @@ CREATE TABLE db_active_replica (
     master character varying
 );
 
+ALTER TABLE public.db_active_replica OWNER TO postgres;
+
+
 --
 -- Name: db_state; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --

@@ -226,13 +226,13 @@ public class QoSDBCTerminalServerThread extends Thread {
                                 //String sqlDbState = "UPDATE db_state SET vm_id = '" + destinationHost + "' WHERE vm_id = '" + sourceHost + "' AND db_name = '" + databaseName + "'";
                                 
                                 // Replication option
-                                String sqlDbActiveReplic = "INSERT INTO db_active_replica (\"time\", vm_id, master) VALUES (now(), '" + destinationHost + "', '" + sourceHost+ "/" +databaseName + "'";
+                                String sqlDbActiveReplica = "INSERT INTO db_active_replica (\"time\", vm_id, master) VALUES (now(), '" + destinationHost + "', '" + sourceHost+ "/" +databaseName + "'";
                                 
                                 Statement statement = catalogConnection.createStatement();
-                                int dbActiveReplic = statement.executeUpdate(sqlDbActiveReplic);
+                                int dbActiveReplica = statement.executeUpdate(sqlDbActiveReplica);
                                 // int dbState = statement.executeUpdate(sqlDbState);
                                 statement.close();
-                                if (dbActiveReplic > 0) {
+                                if (dbActiveReplica > 0) {
                                     result.setResultObject(result.getResultObject().toString() + "Update Catalog Information Success\n");
                                     OutputMessage.println("[" + "TerminalThread_" + this.getId() + "]: Database replic insert into db_active_replic " + "[OK]" + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
                                 } else {

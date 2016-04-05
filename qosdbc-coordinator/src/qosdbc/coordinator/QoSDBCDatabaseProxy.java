@@ -4,10 +4,12 @@
  */
 package qosdbc.coordinator;
 
+import qosdbc.commons.data_structure.ReplicasList;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import qosdbc.commons.OutputMessage;
 
 /**
  *
@@ -20,20 +22,27 @@ public class QoSDBCDatabaseProxy {
     private Connection connection;
     private String dbName;
     private String vmId;
+    private long id;
 
-    public QoSDBCDatabaseProxy(String dbDriver, String dbURL, String dbName, String dbUser, String dbPassword, String vmId) {
+    public QoSDBCDatabaseProxy(String dbDriver, String dbURL, String dbName, String dbUser, String dbPassword, String vmId, boolean autoCommit) {
+        OutputMessage.println("[QoSDBCDatabaseProxy]: " + dbDriver + " " + dbURL + " " + dbName + " " + dbUser + " " + dbPassword + " " + vmId);
         this.dbName = dbName;
         this.vmId = vmId;
+        this.id = System.currentTimeMillis();
         try {
             Class.forName(dbDriver);
             connection = DriverManager.getConnection(dbURL, dbUser, dbPassword);
-            connection.setAutoCommit(true);
+            connection.setAutoCommit(autoCommit);
             connection.setTransactionIsolation(java.sql.Connection.TRANSACTION_SERIALIZABLE);
         } catch (SQLException ex) {
             connection = null;
         } catch (ClassNotFoundException ex) {
             connection = null;
         }
+    }
+    
+    public long getId() {
+        return id;
     }
 
     public synchronized boolean isActive() {
@@ -108,4 +117,5 @@ public class QoSDBCDatabaseProxy {
     public void setVmId(String vmId) {
         this.vmId = vmId;
     }
+    
 }

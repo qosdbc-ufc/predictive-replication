@@ -28,12 +28,17 @@ public class QoSDBCService extends Thread {
     private Connection catalogConnection;
     private Connection logConnection;
     private List<QoSDBCConnectionProxy> connectionProxies;
+    private QoSDBCLoadBalancer qosdbcLoadBalancer = null;
+    private QoSDBCForecaster qosdbcForecaster = null;
 
     public QoSDBCService(int qosdbcPort, Connection catalogConnection, Connection logConnection) {
         this.qosdbcPort = qosdbcPort;
         this.catalogConnection = catalogConnection;
         this.logConnection = logConnection;
         connectionProxies = new ArrayList<QoSDBCConnectionProxy>();
+        qosdbcLoadBalancer = new QoSDBCLoadBalancer();
+        qosdbcForecaster = new QoSDBCForecaster(logConnection, 30);
+        
         OutputMessage.println("QoSDBC Service is starting");
         try {
             serverSocket = new ServerSocket(qosdbcPort);
@@ -51,11 +56,11 @@ public class QoSDBCService extends Thread {
                 QoSDBCDatabaseProxy databaseProxy = null;
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
-                        databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId);
+                        databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
                         break;
                     }
                     case DatabaseSystem.TYPE_POSTGRES: {
-                        databaseProxy = new QoSDBCDatabaseProxy("org.postgresql.Driver", "jdbc:postgresql://" + vmId + ":5432/" + dbName, dbName, "postgres", "ufc123", vmId);
+                       // databaseProxy = new QoSDBCDatabaseProxy("org.postgresql.Driver", "jdbc:postgresql://" + vmId + ":5432/" + dbName, dbName, "postgres", "ufc123", vmId);
                         break;
                     }
                 }
@@ -79,14 +84,21 @@ public class QoSDBCService extends Thread {
     @Override
     public void run() {
         OutputMessage.println("QoSDBC Service is running");
+        //qosdbcForecaster.start();
         while (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 Socket dbConnection = serverSocket.accept();
 
                 OutputMessage.println("Receiving a database connection request from " + dbConnection.toString());
 
-                QoSDBCConnectionProxy connectionProxy = new QoSDBCConnectionProxy(this, dbConnection, catalogConnection, logConnection);
+                QoSDBCConnectionProxy connectionProxy = 
+                        new QoSDBCConnectionProxy(  this, 
+                                                    dbConnection, 
+                                                    catalogConnection, 
+                                                    logConnection, 
+                                                    qosdbcLoadBalancer);
                 connectionProxies.add(connectionProxy);
+                OutputMessage.println("[Service]: " + "NEW QoSDBCConnectionProxy: " + dbConnection.toString());
                 connectionProxy.start();
             } catch (IOException ex) {
                 OutputMessage.println(ex.getMessage());

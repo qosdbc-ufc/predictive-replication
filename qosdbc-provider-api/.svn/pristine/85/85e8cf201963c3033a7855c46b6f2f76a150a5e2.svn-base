@@ -1,0 +1,149 @@
+annotation.processing.enabled=true
+annotation.processing.enabled.in.editor=false
+annotation.processing.processor.options=
+annotation.processing.processors.list=
+annotation.processing.run.all.processors=true
+annotation.processing.source.output=${build.generated.sources.dir}/ap-source-output
+build.classes.dir=${build.dir}/classes
+build.classes.excludes=**/*.java,**/*.form
+# This directory is removed when the project is cleaned:
+build.dir=build
+build.generated.dir=${build.dir}/generated
+build.generated.sources.dir=${build.dir}/generated-sources
+# Only compile against the classpath explicitly listed here:
+build.sysclasspath=ignore
+build.test.classes.dir=${build.dir}/test/classes
+build.test.results.dir=${build.dir}/test/results
+# Uncomment to specify the preferred debugger connection transport:
+#debug.transport=dt_socket
+debug.classpath=\
+    ${run.classpath}
+debug.test.classpath=\
+    ${run.test.classpath}
+# This directory is removed when the project is cleaned:
+dist.dir=dist
+dist.jar=${dist.dir}/qosdbc-provider-api.jar
+dist.javadoc.dir=${dist.dir}/javadoc
+excludes=
+file.reference.activation-1.1.jar=libext\\activation-1.1.jar
+file.reference.AWSEC2JavaClient-1.2ux.jar=libext\\AWSEC2JavaClient-1.2ux.jar
+file.reference.AWSJavaClientRuntime-1.1.jar=libext\\AWSJavaClientRuntime-1.1.jar
+file.reference.bcprov-jdk15-145.jar=libext\\bcprov-jdk15-145.jar
+file.reference.BlockDeviceLib-1.0.jar=libext\\BlockDeviceLib-1.0.jar
+file.reference.commons-cli-1.1.jar=libext\\commons-cli-1.1.jar
+file.reference.commons-codec-1.4.jar=libext\\commons-codec-1.4.jar
+file.reference.commons-discovery.jar=libext\\commons-discovery.jar
+file.reference.commons-httpclient-3.1.jar=libext\\commons-httpclient-3.1.jar
+file.reference.commons-logging-adapters-1.1.1.jar=libext\\commons-logging-adapters-1.1.1.jar
+file.reference.commons-logging-api-1.1.1.jar=libext\\commons-logging-api-1.1.1.jar
+file.reference.ec2-api-tools-1.6.8.1.jar=libext\\ec2-api-tools-1.6.8.1.jar
+file.reference.EC2CltJavaClient-1.0.jar=libext\\EC2CltJavaClient-1.0.jar
+file.reference.EC2ConversionLib-1.0.jar=libext\\EC2ConversionLib-1.0.jar
+file.reference.EC2WsdlJavaClient-1.0.jar=libext\\EC2WsdlJavaClient-1.0.jar
+file.reference.httpclient-4.2.jar=libext\\httpclient-4.2.jar
+file.reference.HttpClientSslContrib-1.0.jar=libext\\HttpClientSslContrib-1.0.jar
+file.reference.httpcore-4.2.jar=libext\\httpcore-4.2.jar
+file.reference.j2ee_mail.jar=libext\\j2ee_mail.jar
+file.reference.java-xmlbuilder-0.4.jar=libext\\java-xmlbuilder-0.4.jar
+file.reference.jaxb-api.jar=libext\\jaxb-api.jar
+file.reference.jaxb-impl.jar=libext\\jaxb-impl.jar
+file.reference.jaxws-api.jar=libext\\jaxws-api.jar
+file.reference.jdom.jar=libext\\jdom.jar
+file.reference.jets3t-0.9.0.jar=libext\\jets3t-0.9.0.jar
+file.reference.jets3t-gui-0.9.0.jar=libext\\jets3t-gui-0.9.0.jar
+file.reference.log4j-1.2.14.jar=libext\\log4j-1.2.14.jar
+file.reference.serializer.jar=libext\\serializer.jar
+file.reference.stax2-api-3.0.1.jar=libext\\stax2-api-3.0.1.jar
+file.reference.woodstox-core-asl-4.0.5.jar=libext\\woodstox-core-asl-4.0.5.jar
+file.reference.wsdl4j.jar=libext\\wsdl4j.jar
+file.reference.wss4j-1.5.3.jar=libext\\wss4j-1.5.3.jar
+file.reference.xalan.jar=libext\\xalan.jar
+file.reference.xercesImpl.jar=libext\\xercesImpl.jar
+file.reference.xfire-all-1.2.6.jar=libext\\xfire-all-1.2.6.jar
+file.reference.xfire-jsr181-api-1.0-M1.jar=libext\\xfire-jsr181-api-1.0-M1.jar
+file.reference.xml-apis.jar=libext\\xml-apis.jar
+file.reference.XmlSchema-1.4.5.jar=libext\\XmlSchema-1.4.5.jar
+file.reference.xmlsec.jar=libext\\xmlsec.jar
+includes=**
+jar.compress=false
+javac.classpath=\
+    ${file.reference.AWSEC2JavaClient-1.2ux.jar}:\
+    ${file.reference.AWSJavaClientRuntime-1.1.jar}:\
+    ${file.reference.BlockDeviceLib-1.0.jar}:\
+    ${file.reference.EC2CltJavaClient-1.0.jar}:\
+    ${file.reference.EC2ConversionLib-1.0.jar}:\
+    ${file.reference.EC2WsdlJavaClient-1.0.jar}:\
+    ${file.reference.HttpClientSslContrib-1.0.jar}:\
+    ${file.reference.XmlSchema-1.4.5.jar}:\
+    ${file.reference.activation-1.1.jar}:\
+    ${file.reference.bcprov-jdk15-145.jar}:\
+    ${file.reference.commons-cli-1.1.jar}:\
+    ${file.reference.commons-codec-1.4.jar}:\
+    ${file.reference.commons-discovery.jar}:\
+    ${file.reference.commons-httpclient-3.1.jar}:\
+    ${file.reference.commons-logging-adapters-1.1.1.jar}:\
+    ${file.reference.commons-logging-api-1.1.1.jar}:\
+    ${file.reference.ec2-api-tools-1.6.8.1.jar}:\
+    ${file.reference.httpclient-4.2.jar}:\
+    ${file.reference.httpcore-4.2.jar}:\
+    ${file.reference.j2ee_mail.jar}:\
+    ${file.reference.java-xmlbuilder-0.4.jar}:\
+    ${file.reference.jaxb-api.jar}:\
+    ${file.reference.jaxb-impl.jar}:\
+    ${file.reference.jaxws-api.jar}:\
+    ${file.reference.jdom.jar}:\
+    ${file.reference.jets3t-0.9.0.jar}:\
+    ${file.reference.jets3t-gui-0.9.0.jar}:\
+    ${file.reference.log4j-1.2.14.jar}:\
+    ${file.reference.serializer.jar}:\
+    ${file.reference.stax2-api-3.0.1.jar}:\
+    ${file.reference.woodstox-core-asl-4.0.5.jar}:\
+    ${file.reference.wsdl4j.jar}:\
+    ${file.reference.wss4j-1.5.3.jar}:\
+    ${file.reference.xalan.jar}:\
+    ${file.reference.xercesImpl.jar}:\
+    ${file.reference.xfire-all-1.2.6.jar}:\
+    ${file.reference.xfire-jsr181-api-1.0-M1.jar}:\
+    ${file.reference.xml-apis.jar}:\
+    ${file.reference.xmlsec.jar}
+# Space-separated list of extra javac options
+javac.compilerargs=
+javac.deprecation=false
+javac.processorpath=\
+    ${javac.classpath}
+javac.source=1.7
+javac.target=1.7
+javac.test.classpath=\
+    ${javac.classpath}:\
+    ${build.classes.dir}
+javac.test.processorpath=\
+    ${javac.test.classpath}
+javadoc.additionalparam=
+javadoc.author=false
+javadoc.encoding=${source.encoding}
+javadoc.noindex=false
+javadoc.nonavbar=false
+javadoc.notree=false
+javadoc.private=false
+javadoc.splitindex=true
+javadoc.use=true
+javadoc.version=false
+javadoc.windowtitle=
+main.class=qosdbc.provider.api.Main
+manifest.file=manifest.mf
+meta.inf.dir=${src.dir}/META-INF
+mkdist.disabled=false
+platform.active=default_platform
+run.classpath=\
+    ${javac.classpath}:\
+    ${build.classes.dir}
+# Space-separated list of JVM arguments used when running the project.
+# You may also define separate properties like run-sys-prop.name=value instead of -Dname=value.
+# To set system properties for unit tests define test-sys-prop.name=value:
+run.jvmargs=
+run.test.classpath=\
+    ${javac.test.classpath}:\
+    ${build.test.classes.dir}
+source.encoding=UTF-8
+src.dir=src
+test.src.dir=test

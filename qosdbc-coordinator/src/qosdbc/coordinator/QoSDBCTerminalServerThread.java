@@ -162,7 +162,8 @@ public class QoSDBCTerminalServerThread extends Thread {
                             Command commandDump = new Command();
                             commandDump.setCode(CommandCode.DATABASE_DUMP);
                             commandDump.setParameters(hashMap);
-
+                            commandDump.toString();
+                            
                             timestamp = System.currentTimeMillis();
                             outputStreamSourceAgent.writeObject(commandDump);
                             outputStreamSourceAgent.reset();

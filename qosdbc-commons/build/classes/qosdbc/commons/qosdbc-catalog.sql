@@ -47,6 +47,19 @@ CREATE TABLE db_active (
 ALTER TABLE public.db_active OWNER TO postgres;
 
 --
+-- Name: db_active_replica; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE db_active_replica (
+    "time" time without time zone,
+    vm_id character varying,
+    master character varying
+);
+
+ALTER TABLE public.db_active_replica OWNER TO postgres;
+
+
+--
 -- Name: db_state; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
 --
 

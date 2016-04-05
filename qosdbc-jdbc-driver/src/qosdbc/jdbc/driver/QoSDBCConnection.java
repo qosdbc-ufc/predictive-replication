@@ -123,6 +123,7 @@ public class QoSDBCConnection implements Connection {
         } finally {
         }
         if (response == null || response.getState() != RequestCode.STATE_SUCCESS) {
+            OutputMessage.println("ERROR CRITICO: COMMANDO: " + request.getCommand() + "response.getState(): " + response.getState() + " CODE: " + request.getCode() + " response: " + request);
             OutputMessage.println("ERROR: " + (request != null && request.getCommand().trim().length() > 0 ? request.getCommand() : "Invalid query"));
         }
         return response;

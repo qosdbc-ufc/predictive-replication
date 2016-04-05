@@ -10,13 +10,8 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Properties;
 import qosdbc.commons.OutputMessage;
-import qosdbc.provider.api.Provider;
-import qosdbc.provider.api.ProviderAmazonImpl;
-import qosdbc.provider.api.ProviderException;
-import qosdbc.provider.api.VirtualMachine;
 
 /**
  *

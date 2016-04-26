@@ -106,11 +106,12 @@ public class QoSDBCConnectionProxy extends Thread {
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
                         if (dao != null) {
-                         dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, dao.getConnection().getAutoCommit());   
+                          dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, dao.getConnection().getAutoCommit());   
                         } else {
-                            dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, true);   
+                          dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, true);   
                         }
                         foundDatabase = true;
+                        
                         break;
                     }
                     case DatabaseSystem.TYPE_POSTGRES: {

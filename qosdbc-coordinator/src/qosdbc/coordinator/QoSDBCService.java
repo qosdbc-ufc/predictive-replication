@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
@@ -30,6 +31,7 @@ public class QoSDBCService extends Thread {
     private List<QoSDBCConnectionProxy> connectionProxies;
     private QoSDBCLoadBalancer qosdbcLoadBalancer = null;
     private QoSDBCForecaster qosdbcForecaster = null;
+    HashMap<String, QoSDBCForecaster> forecastingThreads = null;
 
     public QoSDBCService(int qosdbcPort, Connection catalogConnection, Connection logConnection) {
         this.qosdbcPort = qosdbcPort;
@@ -37,7 +39,7 @@ public class QoSDBCService extends Thread {
         this.logConnection = logConnection;
         connectionProxies = new ArrayList<QoSDBCConnectionProxy>();
         qosdbcLoadBalancer = new QoSDBCLoadBalancer();
-        qosdbcForecaster = new QoSDBCForecaster(logConnection, 30);
+        forecastingThreads = new HashMap<String, QoSDBCForecaster>();
         
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -54,9 +56,13 @@ public class QoSDBCService extends Thread {
                 int dbmsType = resultSet.getInt("dbms_type");
                 String vmId = resultSet.getString("vm_id");
                 QoSDBCDatabaseProxy databaseProxy = null;
+                QoSDBCForecaster qosdbcForecaster = null;
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
+                        qosdbcForecaster = new QoSDBCForecaster(logConnection, 300, vmId, dbName);
+                        qosdbcForecaster.start();
+                        forecastingThreads.put(vmId+dbName, qosdbcForecaster);
                         break;
                     }
                     case DatabaseSystem.TYPE_POSTGRES: {
@@ -84,7 +90,6 @@ public class QoSDBCService extends Thread {
     @Override
     public void run() {
         OutputMessage.println("QoSDBC Service is running");
-        //qosdbcForecaster.start();
         while (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 Socket dbConnection = serverSocket.accept();
@@ -173,5 +178,4 @@ public class QoSDBCService extends Thread {
     public synchronized void removeConnectionProxy(QoSDBCConnectionProxy proxy) {
         connectionProxies.remove(proxy);
     }
-
 }

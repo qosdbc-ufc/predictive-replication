@@ -25,11 +25,12 @@ public class QoSDBCForecaster extends Thread {
     private ForecastService arima = null;
     private int arimaHorizon = 15;
     private Connection logConnection = null;
-    private int timeIntervalInSeconds;
+    private int timePeriodInSeconds;
+    private int timeInterval = 60;
 
     public QoSDBCForecaster(Connection logConnection, int timeIntervalInSeconds) {
         this.logConnection = logConnection;
-        this.timeIntervalInSeconds = timeIntervalInSeconds;
+        this.timePeriodInSeconds = timeIntervalInSeconds;
         arima = new ForecastServiceARIMAImpl();
     }
 
@@ -42,7 +43,7 @@ public class QoSDBCForecaster extends Thread {
             try {
                 String arimaOutput = "";
                 // seconds to sleep
-                Thread.sleep(timeIntervalInSeconds * 1000);
+                Thread.sleep(timePeriodInSeconds * 1000);
                 double[] series = getSeries();
                 if (series.length > 0) {
                     arimaOutput += "Series: ";
@@ -99,7 +100,21 @@ public class QoSDBCForecaster extends Thread {
         for (int i = 0; i < series.length; i++) {
             series[i] = responseTimes.get(i);
         }
-        return series;
+        return filterData(series);
+    }
+    
+    private double[] filterData(double[] data) {
+        int dataSize = data.length;
+        double numberOfDataPoints = timePeriodInSeconds / timeInterval;
+        double dataSizeInterval = dataSize/numberOfDataPoints;
+        int size = (int)dataSize/(int)dataSizeInterval;
+        double[] dataPoints = new double[size];
+        int j=0;
+        for (int i=0; i<dataSize; i+=dataSizeInterval) {
+            dataPoints[j] = data[i];
+            j++;
+        }
+        return dataPoints;
     }
 
     public void stopForecaster() {

@@ -60,9 +60,13 @@ public class QoSDBCService extends Thread {
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
-                        qosdbcForecaster = new QoSDBCForecaster(logConnection, 300, vmId, dbName);
-                        qosdbcForecaster.start();
-                        forecastingThreads.put(vmId+dbName, qosdbcForecaster);
+                        if (!dbName.equals("information_schema") && 
+                            !dbName.equals("mysql") && 
+                            !dbName.equals("performance_schema")) {
+                            qosdbcForecaster = new QoSDBCForecaster(logConnection, 300, vmId, dbName);
+                            qosdbcForecaster.start();
+                            forecastingThreads.put(vmId+dbName, qosdbcForecaster);
+                        }
                         break;
                     }
                     case DatabaseSystem.TYPE_POSTGRES: {

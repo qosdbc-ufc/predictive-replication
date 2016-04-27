@@ -25,7 +25,7 @@ public class QoSDBCDatabaseProxy {
     private long id;
 
     public QoSDBCDatabaseProxy(String dbDriver, String dbURL, String dbName, String dbUser, String dbPassword, String vmId, boolean autoCommit) {
-        OutputMessage.println("[QoSDBCDatabaseProxy]: " + dbDriver + " " + dbURL + " " + dbName + " " + dbUser + " " + dbPassword + " " + vmId);
+        //OutputMessage.println("[QoSDBCDatabaseProxy]: " + dbDriver + " " + dbURL + " " + dbName + " " + dbUser + " " + dbPassword + " " + vmId);
         this.dbName = dbName;
         this.vmId = vmId;
         this.id = System.currentTimeMillis();
@@ -49,6 +49,7 @@ public class QoSDBCDatabaseProxy {
         try {
             return (connection != null && !connection.isClosed());
         } catch (SQLException ex) {
+            OutputMessage.println("ERROR - QoSDBCDatabaseProxy - IsActive Exception");
             return false;
         }
     }

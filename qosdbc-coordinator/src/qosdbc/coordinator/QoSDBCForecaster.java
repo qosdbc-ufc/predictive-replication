@@ -26,7 +26,7 @@ public class QoSDBCForecaster extends Thread {
     private int arimaHorizon = 15;
     private Connection logConnection = null;
     private int timePeriodInSeconds;
-    private int timeInterval = 60;
+    private int timeInterval = 30;
     private String vmId;
     private String dbname;
 
@@ -49,6 +49,10 @@ public class QoSDBCForecaster extends Thread {
                 // seconds to sleep
                 Thread.sleep(timePeriodInSeconds * 1000);
                 double[] series = getSeries();
+                if (series == null) {
+                    OutputMessage.println("ERROR - NO DATA FOR FORECASTER");
+                    break;
+                }
                 if (series.length > 0) {
                     arimaOutput += "Series: ";
                     for (int i = 0; i < series.length; i++) {
@@ -89,7 +93,8 @@ public class QoSDBCForecaster extends Thread {
         long currentTime = System.currentTimeMillis();
         ArrayList<Double> responseTimes = new ArrayList<>();
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
-                "' db_name = '" + dbname + "' time_local >= '" + startTime + "' and time_local <= '" + currentTime + "';";
+                "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
+        OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();
             ResultSet resultSet = statement.executeQuery(sql);
@@ -110,16 +115,22 @@ public class QoSDBCForecaster extends Thread {
     
     private double[] filterData(double[] data) {
         int dataSize = data.length;
-        double numberOfDataPoints = timePeriodInSeconds / timeInterval;
-        double dataSizeInterval = dataSize/numberOfDataPoints;
-        int size = (int)dataSize/(int)dataSizeInterval;
-        double[] dataPoints = new double[size];
-        int j=0;
-        for (int i=0; i<dataSize; i+=dataSizeInterval) {
-            dataPoints[j] = data[i];
-            j++;
-        }
+        OutputMessage.println("Number of rts: " + dataSize);
+        if (dataSize > 0) {
+            double numberOfDataPoints = timePeriodInSeconds / timeInterval;
+            double dataSizeInterval = dataSize/numberOfDataPoints;
+            int size = (int)dataSize/(int)dataSizeInterval;
+            double[] dataPoints = new double[size];
+            int j=0;
+            for (int i=0; i<dataSize; i+=dataSizeInterval) {
+                if (j==size) break;
+                dataPoints[j] = data[i];
+                j++;
+            }
+        
         return dataPoints;
+        }
+        return null;
     }
 
     public void stopForecaster() {

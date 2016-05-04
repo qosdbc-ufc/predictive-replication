@@ -10,6 +10,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import qosdbc.commons.OutputMessage;
 import qosdbc.forecast.*;
@@ -106,31 +108,44 @@ public class QoSDBCForecaster extends Thread {
         } catch (SQLException ex) {
             OutputMessage.println("ERROR -  Could not query response times from Log");
         }
-        double[] series = new double[responseTimes.size()];
-        for (int i = 0; i < series.length; i++) {
-            series[i] = responseTimes.get(i);
+        return filterData(responseTimes);
+    }
+
+   private static double[] filterData(ArrayList<Double> input) {
+        int dataSize = input.size();
+        double numberOfDataPoints = 600 / 30;
+        int chunkSize = (int)dataSize/(int)numberOfDataPoints;
+        chunkSize++;
+        
+        int size = dataSize/chunkSize;
+        List<Double> dataPoints = new ArrayList<Double>();
+        int j=0;
+        int outCut = 0;
+        for (int i=0;i<input.size();i = i + chunkSize) {
+            if (chunkSize + i >= input.size()) {
+                outCut = input.size();
+            } else {
+                outCut = chunkSize + i;
+            }
+            //System.out.println("\nRange: i=" + i + " to=" + (outCut-1));
+            dataPoints.add(mean(input.subList(i, outCut)));
+            j++;
         }
-        return filterData(series);
+        double[] series = new double[dataPoints.size()];
+        for (int i = 0; i < series.length; i++) {
+            series[i] = dataPoints.get(i);
+        }
+        return series;
     }
     
-    private double[] filterData(double[] data) {
-        int dataSize = data.length;
-        OutputMessage.println("Number of rts: " + dataSize);
-        if (dataSize > 0) {
-            double numberOfDataPoints = timePeriodInSeconds / timeInterval;
-            double dataSizeInterval = dataSize/numberOfDataPoints;
-            int size = (int)dataSize/(int)dataSizeInterval;
-            double[] dataPoints = new double[size];
-            int j=0;
-            for (int i=0; i<dataSize; i+=dataSizeInterval) {
-                if (j==size) break;
-                dataPoints[j] = data[i];
-                j++;
-            }
-        
-        return dataPoints;
+    private static double mean(List<Double> data) {
+        double sum = 0;
+        for (int i=0;i<data.size();i++) {
+            //System.out.print(data.get(i) + " ");
+            sum += data.get(i); 
         }
-        return null;
+        sum /= data.size();
+        return sum;
     }
 
     public void stopForecaster() {

@@ -103,7 +103,7 @@ public class QoSDBCAgentThread extends Thread {
                         /* Database dump process */
                         File dumpFile = ShellCommand.dumpCompleteDatabase(database, username, password);
                         if (dumpFile != null) {
-                            FileUtils.copyFileToDirectory(dumpFile, new File("/var/www/qosdbc/"));
+                            FileUtils.copyFileToDirectory(dumpFile, new File("/var/www/html/qosdbc/"));
                             result.setResultObject("http://" + vmId + "/qosdbc/" + dumpFile.getName());
                             result.setState(CommandCode.STATE_SUCCESS);
                         }

@@ -10,7 +10,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import qosdbc.commons.OutputMessage;
@@ -42,7 +41,7 @@ public class QoSDBCForecaster extends Thread {
 
     @Override
     public void run() {
-        OutputMessage.println("Forecasting running...");
+        OutputMessage.println("[QoSDBCForecaster("+vmId+"/"+dbname+")]Forecasting running...");
         startTime = System.currentTimeMillis();
 
         while (runThread) {
@@ -111,9 +110,9 @@ public class QoSDBCForecaster extends Thread {
         return filterData(responseTimes);
     }
 
-   private static double[] filterData(ArrayList<Double> input) {
+   private double[] filterData(ArrayList<Double> input) {
         int dataSize = input.size();
-        double numberOfDataPoints = 600 / 30;
+        double numberOfDataPoints = timePeriodInSeconds / timeInterval;
         int chunkSize = (int)dataSize/(int)numberOfDataPoints;
         chunkSize++;
         

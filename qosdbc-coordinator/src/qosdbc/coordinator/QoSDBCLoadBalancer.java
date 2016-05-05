@@ -16,7 +16,6 @@ import java.util.logging.Logger;
 import qosdbc.commons.OutputMessage;
 
 /**
- *
  * @author serafim
  */
 public class QoSDBCLoadBalancer {

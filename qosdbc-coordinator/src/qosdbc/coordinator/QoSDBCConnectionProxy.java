@@ -110,8 +110,7 @@ public class QoSDBCConnectionProxy extends Thread {
                         } else {
                           dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, true);   
                         }
-                        foundDatabase = true;
-                        
+                        foundDatabase = true;                       
                         break;
                     }
                     case DatabaseSystem.TYPE_POSTGRES: {
@@ -229,6 +228,11 @@ public class QoSDBCConnectionProxy extends Thread {
                         //OutputMessage.println("[" + proxyId + "]: Trying to get a dao...");
                         while (dao == null) {
                           dao = getDatabaseProxy(databaseName);  
+                          try {
+                             Thread.sleep(1000);
+                           } catch (InterruptedException ex) {
+                             Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
+                           }
                         }
                         //OutputMessage.println("[" + proxyId + "]: GOT IT");
                         Connection connection = dao.getConnection();
@@ -267,6 +271,11 @@ public class QoSDBCConnectionProxy extends Thread {
                                 //OutputMessage.println("[" + proxyId + "]: Trying to get a dao...");
                                 while (dao == null) {
                                   dao = getDatabaseProxy(databaseName);  
+                                    try {
+                                        Thread.sleep(1000);
+                                    } catch (InterruptedException ex) {
+                                        Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
                                 }
                                 //OutputMessage.println("[" + proxyId + "]: GOT IT");
                                 response.setState(RequestCode.STATE_SUCCESS);
@@ -346,6 +355,7 @@ public class QoSDBCConnectionProxy extends Thread {
                                 dao.commit();
                                 changeDAO = true;
                                 response.setState(RequestCode.STATE_SUCCESS);
+                                dao.close();
                                 break;
                             }
                             case RequestCode.SQL_ROLLBACK: {

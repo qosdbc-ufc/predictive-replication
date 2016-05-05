@@ -65,6 +65,9 @@ public class QoSDBCService extends Thread {
                             !dbName.equals("performance_schema")) {
                             qosdbcForecaster = new QoSDBCForecaster(logConnection, 300, vmId, dbName);
                             qosdbcForecaster.start();
+                            if (qosdbcForecaster.isAlive()) {
+                                OutputMessage.println("[QoSDBCService]: Forecaster("+dbName + " in " + vmId + ") is on!");
+                            }
                             forecastingThreads.put(vmId+dbName, qosdbcForecaster);
                         }
                         break;

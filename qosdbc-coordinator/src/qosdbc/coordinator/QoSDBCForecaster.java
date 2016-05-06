@@ -10,9 +10,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
+import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
+import qosdbc.commons.command.Command;
+import qosdbc.commons.command.CommandCode;
 import qosdbc.forecast.*;
 
 /**
@@ -30,9 +33,20 @@ public class QoSDBCForecaster extends Thread {
     private int timeInterval = 30;
     private String vmId;
     private String dbname;
+    private Connection catalogConnection;
+    private QoSDBCService qosdbcService = null;
+    private int numberOfReplicas = 0;
+    private boolean pauseThread = false;
 
-    public QoSDBCForecaster(Connection logConnection, int timeIntervalInSeconds, String vmId, String dbname) {
+    public QoSDBCForecaster(Connection logConnection, 
+            Connection catalogConnection,
+            QoSDBCService qosdbcService,
+            int timeIntervalInSeconds, 
+            String vmId, 
+            String dbname) {
+        this.catalogConnection = catalogConnection;
         this.logConnection = logConnection;
+        this.qosdbcService = qosdbcService;
         this.timePeriodInSeconds = timeIntervalInSeconds;
         arima = new ForecastServiceARIMAImpl();
         this.vmId = vmId;
@@ -46,9 +60,16 @@ public class QoSDBCForecaster extends Thread {
 
         while (runThread) {
             try {
+                while(pauseThread) {
+                    Thread.sleep(timePeriodInSeconds * 1000);
+                }
                 String arimaOutput = "";
                 // seconds to sleep
                 Thread.sleep(timePeriodInSeconds * 1000);
+                while(pauseThread) {
+                    Thread.sleep(timePeriodInSeconds * 1000);
+                }
+                
                 double[] series = getSeries();
                 if (series == null) {
                     OutputMessage.println("ERROR - NO DATA FOR FORECASTER");
@@ -78,6 +99,13 @@ public class QoSDBCForecaster extends Thread {
                         }
                     }
                     OutputMessage.println(arimaOutput);
+                    int largestRtIndex = max(result);
+                    if (shouldCreateReplica(result[largestRtIndex])) {
+                        int timeInTheFuture = timeInterval*(largestRtIndex+1);
+                        OutputMessage.println("SLA violation forecasted in " + 
+                                timeInTheFuture + " seconds. Value = " + result[largestRtIndex]);
+                        createReplica();
+                    }
                 }
             } catch (InterruptedException ex) {
                 OutputMessage.println("ERROR - Error in QoSDBCForecaster thread");
@@ -165,5 +193,56 @@ public class QoSDBCForecaster extends Thread {
 
     public void setArimaHorizon(int arimaHorizon) {
         this.arimaHorizon = arimaHorizon;
+    }
+    
+    private void createReplica() {
+        String sourceHost = vmId;
+        String databaseName = dbname;
+        String databaseSystem = String.valueOf(DatabaseSystem.TYPE_MYSQL);
+        String destinationHost = "10.102.20.63";
+        
+        Command command = new Command();
+        command.setCode(CommandCode.TERMINAL_MIGRATE);
+        HashMap<String, Object> commandParams = new HashMap<String, Object>();
+        commandParams.put("sourceHost", sourceHost);
+        commandParams.put("databaseName", databaseName);
+        commandParams.put("databaseSystem", databaseSystem);
+        commandParams.put("destinationHost", destinationHost);
+        command.setParameters(commandParams);
+        
+        ReplicationThread replicationThread = new ReplicationThread(command,
+                                                                    catalogConnection, 
+                                                                    logConnection, 
+                                                                    qosdbcService);
+        replicationThread.start();
+        numberOfReplicas++;
+    }
+    
+    private boolean shouldCreateReplica(double futureResponseTime) {
+        if (numberOfReplicas > 0) return false;
+       
+        if (futureResponseTime > 1.5000) return true;
+        
+        return false;
+    }
+    
+    private int max(double[] futureResponseTimes) {
+        int largestRtIndex = 0;
+        double largestRt = 0;
+        for (int i=0;i<futureResponseTimes.length; i++) {
+            if (futureResponseTimes[i] > largestRt) {
+                largestRtIndex = i;
+                largestRt = futureResponseTimes[i];
+            }
+        }
+        return largestRtIndex;
+    }
+    
+    public void pauseForecaster() {
+       pauseThread = true;
+    }
+    
+    public void resumeForecaster() {
+       pauseThread = false;
     }
 }

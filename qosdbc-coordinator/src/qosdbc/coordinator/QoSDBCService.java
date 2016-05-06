@@ -15,6 +15,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
 
@@ -63,7 +65,7 @@ public class QoSDBCService extends Thread {
                         if (!dbName.equals("information_schema") && 
                             !dbName.equals("mysql") && 
                             !dbName.equals("performance_schema")) {
-                            qosdbcForecaster = new QoSDBCForecaster(logConnection, 300, vmId, dbName);
+                            qosdbcForecaster = new QoSDBCForecaster(logConnection, catalogConnection, this, 300, vmId, dbName);
                             qosdbcForecaster.start();
                             if (qosdbcForecaster.isAlive()) {
                                 OutputMessage.println("[QoSDBCService]: Forecaster("+dbName + " in " + vmId + ") is on!");
@@ -100,9 +102,6 @@ public class QoSDBCService extends Thread {
         while (serverSocket != null && !serverSocket.isClosed()) {
             try {
                 Socket dbConnection = serverSocket.accept();
-
-                OutputMessage.println("Receiving a database connection request from " + dbConnection.toString());
-
                 QoSDBCConnectionProxy connectionProxy = 
                         new QoSDBCConnectionProxy(  this, 
                                                     dbConnection, 
@@ -133,6 +132,8 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.pause();
+                if (forecastingThreads.containsKey(dao.getVmId()+dao.getDbName()))
+                    forecastingThreads.get(dao.getVmId()+dao.getDbName()).pauseForecaster();
                 numberOfConnections++;
             }
         }
@@ -156,6 +157,8 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.play();
+                if (forecastingThreads.containsKey(dao.getVmId()+dao.getDbName()))
+                    forecastingThreads.get(dao.getVmId()+dao.getDbName()).resumeForecaster();
                 numberOfConnections++;
             }
         }
@@ -183,6 +186,14 @@ public class QoSDBCService extends Thread {
     }
 
     public synchronized void removeConnectionProxy(QoSDBCConnectionProxy proxy) {
+        String vmId = proxy.getCurrentDAO().getVmId();
+        String dbName = proxy.getCurrentDAO().getDbName();
         connectionProxies.remove(proxy);
+       /* if (forecastingThreads.containsKey(vmId+dbName)) {
+        QoSDBCForecaster forecasterThread = forecastingThreads.get(vmId+dbName);
+        if (forecasterThread != null) forecasterThread.stopForecaster();
+        forecastingThreads.remove(vmId+dbName);
+        }
+        */
     }
 }

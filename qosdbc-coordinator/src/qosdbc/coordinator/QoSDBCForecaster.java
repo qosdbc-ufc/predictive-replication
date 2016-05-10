@@ -199,7 +199,15 @@ public class QoSDBCForecaster extends Thread {
         String sourceHost = vmId;
         String databaseName = dbname;
         String databaseSystem = String.valueOf(DatabaseSystem.TYPE_MYSQL);
-        String destinationHost = "10.102.20.63";
+        String destinationHost = getHostForNewReplica();
+        
+        if (destinationHost == null) {
+            // ERROR 
+            // No available hosts anymore
+            OutputMessage.println("ERROR -  Could not create new replica of " +
+                    dbname + " - No available hosts!");
+            return;
+        }
         
         Command command = new Command();
         command.setCode(CommandCode.TERMINAL_MIGRATE);
@@ -220,10 +228,7 @@ public class QoSDBCForecaster extends Thread {
     
     private boolean shouldCreateReplica(double futureResponseTime) {
         if (numberOfReplicas > 0) return false;
-       
-        if (futureResponseTime > 1.5000) return true;
-        
-        return false;
+        return futureResponseTime > 1.5000;
     }
     
     private int max(double[] futureResponseTimes) {
@@ -244,5 +249,55 @@ public class QoSDBCForecaster extends Thread {
     
     public void resumeForecaster() {
        pauseThread = false;
+    }
+    
+    public String getHostForNewReplica() {
+        String newReplicaHost = null;
+        
+        ArrayList<String> allHosts = getAvailableHosts();
+        ArrayList<String> replicaHosts = getReplicaHosts();
+        
+        for (String target : allHosts) {
+            if (target.equals(this.vmId)) continue;
+            if (replicaHosts.contains(target)) continue;
+            newReplicaHost = target;
+            break;
+        }
+        return newReplicaHost;
+    }
+    
+    public ArrayList<String> getAvailableHosts() {
+        ArrayList<String> vmLists = new ArrayList<String>();
+        
+        String sql = "SELECT vm_id FROM vm_active";
+        try {
+            Statement statement = catalogConnection.createStatement();
+            ResultSet resultSet = statement.executeQuery(sql);
+            while (resultSet.next()) {
+                String host = resultSet.getString("vm_id");
+                vmLists.add(host);
+            }
+        } catch (SQLException ex) {
+            OutputMessage.println("ERROR -  Could not query the possible target for new replica");
+        }
+        return vmLists;
+    }
+    
+    public ArrayList<String> getReplicaHosts() {
+        ArrayList<String> vmLists = new ArrayList<String>();
+        
+        String sql = "SELECT vm_id FROM db_active_replica";
+        try {
+            Statement statement = catalogConnection.createStatement();
+            ResultSet resultSet = statement.executeQuery(sql);
+            while (resultSet.next()) {
+                String host = resultSet.getString("vm_id");
+                vmLists.add(host);
+            }
+        } catch (SQLException ex) {
+            OutputMessage.println("ERROR -  Could not query replicas list of " +
+                    dbname);
+        }
+        return vmLists;
     }
 }

@@ -4,7 +4,10 @@
  */
 package qosdbc.coordinator;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.Connection;
@@ -15,6 +18,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import qosdbc.commons.DatabaseSystem;
@@ -51,6 +55,13 @@ public class QoSDBCService extends Thread {
             serverSocket = null;
         }
         try {
+            
+            Properties prop = new Properties();
+            InputStream propInput = null;
+            String fileProperties = System.getProperty("user.dir") + System.getProperty("file.separator") + "sla.properties";
+            propInput = new FileInputStream(fileProperties);
+            prop.load(propInput);
+            
             Statement statement = catalogConnection.createStatement();
             ResultSet resultSet = statement.executeQuery("SELECT \"time\", vm_id, db_name, dbms_type from db_active");
             while (resultSet.next()) {
@@ -65,7 +76,13 @@ public class QoSDBCService extends Thread {
                         if (!dbName.equals("information_schema") && 
                             !dbName.equals("mysql") && 
                             !dbName.equals("performance_schema")) {
-                            qosdbcForecaster = new QoSDBCForecaster(logConnection, catalogConnection, this, 300, vmId, dbName);
+                            qosdbcForecaster = new QoSDBCForecaster(logConnection,
+                                    catalogConnection,
+                                    this,
+                                    300,
+                                    vmId,
+                                    dbName,
+                                    Double.parseDouble(prop.getProperty(dbName+"_sla")));
                             qosdbcForecaster.start();
                             if (qosdbcForecaster.isAlive()) {
                                 OutputMessage.println("[QoSDBCService]: Forecaster("+dbName + " in " + vmId + ") is on!");
@@ -89,9 +106,17 @@ public class QoSDBCService extends Thread {
             }
             resultSet.close();
             statement.close();
+            if (propInput != null) propInput.close();
+
         } catch (SQLException ex) {
             OutputMessage.println("ERROR: " + ex.getMessage());
             serverSocket = null;
+        } catch (FileNotFoundException ex) {
+            OutputMessage.println("ERROR: Could not open SLA properties file!");
+            System.exit(0);
+        } catch (IOException ex) {
+            OutputMessage.println("ERROR: Error while loading SLA properties file!");
+            System.exit(0);
         }
         OutputMessage.println("The tests and creation of the databases connection were performed successfully");
     }

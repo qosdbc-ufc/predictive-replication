@@ -37,13 +37,15 @@ public class QoSDBCForecaster extends Thread {
     private QoSDBCService qosdbcService = null;
     private int numberOfReplicas = 0;
     private boolean pauseThread = false;
+    private double sla;
 
     public QoSDBCForecaster(Connection logConnection, 
             Connection catalogConnection,
             QoSDBCService qosdbcService,
             int timeIntervalInSeconds, 
             String vmId, 
-            String dbname) {
+            String dbname,
+            double sla) {
         this.catalogConnection = catalogConnection;
         this.logConnection = logConnection;
         this.qosdbcService = qosdbcService;
@@ -51,6 +53,7 @@ public class QoSDBCForecaster extends Thread {
         arima = new ForecastServiceARIMAImpl();
         this.vmId = vmId;
         this.dbname = dbname;
+        this.sla = sla;
     }
 
     @Override
@@ -228,7 +231,7 @@ public class QoSDBCForecaster extends Thread {
     
     private boolean shouldCreateReplica(double futureResponseTime) {
         if (numberOfReplicas > 0) return false;
-        return futureResponseTime > 1.5000;
+        return futureResponseTime > sla;
     }
     
     private int max(double[] futureResponseTimes) {

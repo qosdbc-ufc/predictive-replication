@@ -250,10 +250,11 @@ public class ReplicationThread extends Thread {
                         + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
             }
 
+            
             /* Change database connection in database proxy - Start */
-            OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: CHANGE CONNECTION " + "START");
-            qosdbcService.changeDatabaseConnection(databaseName);
-            OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: CHANGE CONNECTION " + "END");
+            //OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: CHANGE CONNECTION " + "START");
+            //qosdbcService.changeDatabaseConnection(databaseName);
+            //OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: CHANGE CONNECTION " + "END");
             /* Change database connection in database proxy - End */
 
             /* Play all paused connection proxies of the database - Begin */

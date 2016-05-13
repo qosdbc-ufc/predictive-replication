@@ -322,17 +322,28 @@ public class Main {
                         switch (databaseSystem.getType()) {
                             case qosdbc.commons.DatabaseSystem.TYPE_MYSQL: {
                                 List<Database> mysqlDatabases = ShellCommand.getDatabases(databaseSystem.getType(), databaseSystem.getUser(), databaseSystem.getPassword());
+                                if (mysqlDatabases.isEmpty()) {
+                                    qosdbc.commons.OutputMessage.println("qosdbc-agent: No active DBs.");
+                                }
                                 try {
+                                    String dbName;
                                     for (Database database : mysqlDatabases) {
-                                        String dbName = database.getName();
+                                        dbName = database.getName();
                                         String schemaDefinition = ShellCommand.dumpDatabase(database, databaseSystem.getUser(), databaseSystem.getPassword());
                                         if (schemaDefinition != null) {
                                             schemaDefinition = schemaDefinition.replaceAll("[\']", "''");
                                         }
-                                        int result = statement.executeUpdate("INSERT INTO db_active (\"time\", vm_id, db_name, dbms_type, schema_definition, dbms_user, dbms_password, dbms_port) VALUES (now(), '" + vmId + "', '" + dbName + "', " + databaseSystem.getType() + ", '" + schemaDefinition + "', 'root', 'ufc123', 3306)");
+
+                                        int result = statement.executeUpdate("INSERT INTO db_active (\"time\", vm_id, db_name, dbms_type, schema_definition, dbms_user, dbms_password, dbms_port) VALUES (now(), '"
+                                                + vmId + "', '"
+                                                + dbName + "', "
+                                                + databaseSystem.getType() + ", '"
+                                                + schemaDefinition + "', 'root', 'ufc123', 3306)");
                                         qosdbc.commons.OutputMessage.println("qosdbc-agent: [db_active] Database " + dbName + " was inserted (" + (result == 1) + ")");
                                     }
+
                                 } catch (SQLException ex) {
+                                    qosdbc.commons.OutputMessage.println("ERROR - qosdbc-agent: Could not add database to catalog.");
                                     throw ex;
                                 }
                                 break;

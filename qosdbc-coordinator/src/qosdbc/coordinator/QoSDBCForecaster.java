@@ -30,7 +30,7 @@ public class QoSDBCForecaster extends Thread {
     private int arimaHorizon = 15;
     private Connection logConnection = null;
     private int timePeriodInSeconds;
-    private int timeInterval = 30;
+    private int timeInterval = 15;
     private String vmId;
     private String dbname;
     private Connection catalogConnection;

@@ -121,7 +121,10 @@ public class QoSDBCStatement implements Statement {
         if (resultSetList == null || response.getState() != RequestCode.STATE_SUCCESS) {
             throw new SQLException("Invalid query");
         }
-        QoSDBCResultSet resultSet = new QoSDBCResultSet(resultSetList, connection, Long.parseLong(request.getParameterValue("resultSetId").toString()), getStatementID());
+        QoSDBCResultSet resultSet = new QoSDBCResultSet(resultSetList,
+                connection,
+                Long.parseLong(request.getParameterValue("resultSetId").toString()),
+                getStatementID());
         return resultSet;
     }
 

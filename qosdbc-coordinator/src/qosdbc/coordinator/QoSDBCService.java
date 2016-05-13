@@ -79,7 +79,7 @@ public class QoSDBCService extends Thread {
                             qosdbcForecaster = new QoSDBCForecaster(logConnection,
                                     catalogConnection,
                                     this,
-                                    300,
+                                    150,
                                     vmId,
                                     dbName,
                                     Double.parseDouble(prop.getProperty(dbName+"_sla")));
@@ -134,7 +134,7 @@ public class QoSDBCService extends Thread {
                                                     logConnection, 
                                                     qosdbcLoadBalancer);
                 connectionProxies.add(connectionProxy);
-                OutputMessage.println("[Service]: " + "NEW QoSDBCConnectionProxy: " + dbConnection.toString());
+                //OutputMessage.println("[Service]: " + "NEW QoSDBCConnectionProxy: " + dbConnection.toString());
                 connectionProxy.start();
             } catch (IOException ex) {
                 OutputMessage.println(ex.getMessage());

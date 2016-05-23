@@ -79,14 +79,11 @@ public class QoSDBCService extends Thread {
                             qosdbcForecaster = new QoSDBCForecaster(logConnection,
                                     catalogConnection,
                                     this,
-                                    150,
+                                    Integer.parseInt(prop.getProperty(dbName+"_pinterval")),
                                     vmId,
                                     dbName,
                                     Double.parseDouble(prop.getProperty(dbName+"_sla")));
                             qosdbcForecaster.start();
-                            if (qosdbcForecaster.isAlive()) {
-                                OutputMessage.println("[QoSDBCService]: Forecaster("+dbName + " in " + vmId + ") is on!");
-                            }
                             forecastingThreads.put(vmId+dbName, qosdbcForecaster);
                         }
                         break;

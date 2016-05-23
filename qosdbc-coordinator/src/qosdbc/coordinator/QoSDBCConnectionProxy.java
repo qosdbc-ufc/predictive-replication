@@ -4,6 +4,7 @@
  */
 package qosdbc.coordinator;
 
+import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import qosdbc.commons.DatabaseSystem;
@@ -196,7 +198,7 @@ public class QoSDBCConnectionProxy extends Thread {
         ObjectInputStream inputStream = null;
         boolean proceed = true;
         try {
-            outputStream = new ObjectOutputStream((dbConnection.getOutputStream()));
+            outputStream = new ObjectOutputStream(new BufferedOutputStream(dbConnection.getOutputStream()));
             inputStream = new ObjectInputStream((dbConnection.getInputStream()));
         } catch (IOException ex) {
             OutputMessage.println("[" + proxyId + "]: Closing proxy connection");
@@ -208,7 +210,7 @@ public class QoSDBCConnectionProxy extends Thread {
         while (proceed && dbConnection != null && dbConnection.isConnected()) {
             try {
 
-                synchronized (this) { // SYNCHRONIZED
+               // synchronized (this) { // SYNCHRONIZED
                     if (pause && (lastRequest != null
                             && (lastRequest.getCode() == RequestCode.SQL_COMMIT
                             || lastRequest.getCode() == RequestCode.SQL_ROLLBACK))) {
@@ -225,21 +227,13 @@ public class QoSDBCConnectionProxy extends Thread {
                             OutputMessage.println("[" + proxyId + "]: Error " + ex.getMessage());
                         }
                     }
-                } // SYNCHRONIZED
+             //   } // SYNCHRONIZED
 
                 if (changeDAO) {
                     try {
                         boolean autoCommit = dao.getConnection().getAutoCommit();
                         dao = getDatabaseProxy(databaseName);
                         //OutputMessage.println("[" + proxyId + "]: Trying to get a dao...");
-                        while (dao == null) {
-                            dao = getDatabaseProxy(databaseName);
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException ex) {
-                                Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                        }
                         //OutputMessage.println("[" + proxyId + "]: GOT IT");
                         Connection connection = dao.getConnection();
                         connection.setAutoCommit(autoCommit);
@@ -259,31 +253,22 @@ public class QoSDBCConnectionProxy extends Thread {
                 }
 
                 Object message = inputStream.readObject();
-                synchronized (this) { // SYNCHRONIZED
+               // synchronized (this) { // SYNCHRONIZED
                     if (message instanceof Request) {
                         Request msg = (Request) message;
                         Response response = new Response();
 
-                        long startTime = System.currentTimeMillis();
+                        long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
-                        //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
-                        //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
+                        // OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
+                        //         + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
                         switch (msg.getCode()) {
                             case RequestCode.SQL_CONNECTION_CREATE: {
                                 if (dao != null && dao.isActive()) {
                                     dao.close();
                                 }
                                 dao = getDatabaseProxy(msg.getDatabase());
-                                //OutputMessage.println("[" + proxyId + "]: Trying to get a dao...");
-                                while (dao == null) {
-                                    dao = getDatabaseProxy(databaseName);
-                                    try {
-                                        Thread.sleep(1000);
-                                    } catch (InterruptedException ex) {
-                                        Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
-                                    }
-                                }
-                                //OutputMessage.println("[" + proxyId + "]: GOT IT");
+                                // OutputMessage.println("[" + proxyId + "]: GOT IT");
                                 response.setState(RequestCode.STATE_SUCCESS);
                                 break;
                             }
@@ -300,7 +285,7 @@ public class QoSDBCConnectionProxy extends Thread {
                                 response.setState(RequestCode.STATE_SUCCESS);
                                 try {
                                     if (dao.getConnection().getAutoCommit()) {
-                                        changeDAO = true;
+                                        //changeDAO = true;
                                     }
                                     Statement statement = dao.getConnection().createStatement(); // AO MUDAR O DAO, ESTAMOS PERDENDO OS STATEMENTS
                                     statement.setEscapeProcessing(false);
@@ -361,29 +346,22 @@ public class QoSDBCConnectionProxy extends Thread {
                             case RequestCode.SQL_COMMIT: {
                                 msg.setCommand("COMMIT");
                                 dao.commit();
-                                try {
-                                    if (!dao.getConnection().getAutoCommit()) {
-                                        changeDAO = true;
-                                    }
-                                } catch (SQLException ex) {
-                                    Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
+                                if (!dao.getConnection().getAutoCommit()) {
+                                    //changeDAO = true;
                                 }
                                 response.setState(RequestCode.STATE_SUCCESS);
-                                dao.close();
+                                //dao.close();
                                 break;
                             }
                             case RequestCode.SQL_ROLLBACK: {
-                                OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
+                                //OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
                                 msg.setCommand("ROLLBACK");
                                 dao.rollback();
-                                try {
-                                    if (!dao.getConnection().getAutoCommit()) {
-                                        changeDAO = true;
-                                    }
-                                } catch (SQLException ex) {
-                                    Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
+                                if (!dao.getConnection().getAutoCommit()) {
+                                    //changeDAO = true;
                                 }
                                 response.setState(RequestCode.STATE_SUCCESS);
+                                //dao.close();
                                 break;
                             }
                             case RequestCode.SQL_UPDATE: {
@@ -420,9 +398,9 @@ public class QoSDBCConnectionProxy extends Thread {
                             }
                         }
 
-                        long finishTime = System.currentTimeMillis();
-                        response.setStartTime(startTime);
-                        response.setFinishTime(finishTime);
+                        long finishTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        response.setStartTime(TimeUnit.NANOSECONDS.toMillis(startTime));
+                        response.setFinishTime(TimeUnit.NANOSECONDS.toMillis(finishTime));
 
                         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE || msg.getCode() == RequestCode.SQL_RESULTSET_CREATE || msg.getCode() == RequestCode.SQL_COMMIT || msg.getCode() == RequestCode.SQL_ROLLBACK)) {
                             if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
@@ -440,10 +418,9 @@ public class QoSDBCConnectionProxy extends Thread {
                         }
 
                         outputStream.writeObject(response);
-                        outputStream.reset();
+                        outputStream.flush();
 
                         lastRequest = msg;
-
                         if (closeConnection) {
                             //OutputMessage.println("[" + proxyId + "]: Closing proxy connection");
                             if (dbConnection != null) {
@@ -456,9 +433,10 @@ public class QoSDBCConnectionProxy extends Thread {
                             break;
                         }
                     }
-                } // SYNCHRONIZED
+              //  } // SYNCHRONIZED
             } catch (IOException ex) {
                 OutputMessage.println("[" + proxyId + "] ERROR : Closing proxy connection");
+                ex.printStackTrace();
                 if (dbConnection != null) {
                     try {
                         dbConnection.close();
@@ -477,6 +455,8 @@ public class QoSDBCConnectionProxy extends Thread {
                     }
                 }
                 break;
+            } catch (SQLException ex) {
+                Logger.getLogger(QoSDBCConnectionProxy.class.getName()).log(Level.SEVERE, null, ex);
             } // TRY
         } // WHILE
         // Close all database connections

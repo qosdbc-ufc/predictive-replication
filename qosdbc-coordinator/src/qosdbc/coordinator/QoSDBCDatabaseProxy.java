@@ -35,8 +35,12 @@ public class QoSDBCDatabaseProxy {
             connection.setAutoCommit(autoCommit);
             connection.setTransactionIsolation(java.sql.Connection.TRANSACTION_SERIALIZABLE);
         } catch (SQLException ex) {
+            OutputMessage.println("ERROR - QoSDBCDatabaseProxy - SQLException");
+            ex.printStackTrace();
             connection = null;
         } catch (ClassNotFoundException ex) {
+            OutputMessage.println("ERROR - QoSDBCDatabaseProxy - ClassNotFoundException");
+            ex.printStackTrace();
             connection = null;
         }
     }

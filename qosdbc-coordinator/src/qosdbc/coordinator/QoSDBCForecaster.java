@@ -30,7 +30,7 @@ public class QoSDBCForecaster extends Thread {
     private int arimaHorizon = 15;
     private Connection logConnection = null;
     private int timePeriodInSeconds;
-    private int timeInterval = 15;
+    private int timeInterval = 30;
     private String vmId;
     private String dbname;
     private Connection catalogConnection;
@@ -124,8 +124,10 @@ public class QoSDBCForecaster extends Thread {
     private double[] getSeries() {
         long currentTime = System.currentTimeMillis();
         ArrayList<Double> responseTimes = new ArrayList<>();
+       // String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
+       //         "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
-                "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
+        "' AND db_name = '" + dbname + "';";
         OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();

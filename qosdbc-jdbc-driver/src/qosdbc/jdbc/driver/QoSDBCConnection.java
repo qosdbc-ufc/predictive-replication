@@ -4,6 +4,7 @@
  */
 package qosdbc.jdbc.driver;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -69,7 +70,7 @@ public class QoSDBCConnection implements Connection {
         try {
             socket = new Socket(host, port);
             socket.setTcpNoDelay(true);
-            outputStream = new ObjectOutputStream((socket.getOutputStream()));
+            outputStream = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
             inputStream = new ObjectInputStream((socket.getInputStream()));
         } catch (IOException e) {
             throw new SQLException("unable to connect to database: " + e.getMessage());
@@ -106,14 +107,14 @@ public class QoSDBCConnection implements Connection {
         request.setConnectionId(id);
         request.setTransactionId(currentTransactionId);
         Response response = null;
-        long startTime = System.currentTimeMillis();
+        //long startTime = System.currentTimeMillis();
         try {
             outputStream.writeObject(request);
-            //outputStream.flush();
-            outputStream.reset();
+            outputStream.flush();
+            //outputStream.reset();
             try {
                 Object obj = inputStream.readObject();
-                long finishTime = System.currentTimeMillis();
+                //long finishTime = System.currentTimeMillis();
                 response = (Response) obj;
             } catch (ClassNotFoundException e) {
                 throw new SQLException(e.toString());

@@ -5,6 +5,7 @@
  */
 package qosdbc.coordinator;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -89,11 +90,11 @@ public class ReplicationThread extends Thread {
 
             /* Socket to connect destination agent */
             Socket socketDestinationAgent = new Socket(destinationHost, destinationAgentPort);
-            ObjectOutputStream outputStreamDestinationAgent = new ObjectOutputStream((socketDestinationAgent.getOutputStream()));
+            ObjectOutputStream outputStreamDestinationAgent = new ObjectOutputStream(new BufferedOutputStream(socketDestinationAgent.getOutputStream()));
             ObjectInputStream inputStreamDestinationAgent = new ObjectInputStream((socketDestinationAgent.getInputStream()));
             /* Socket to connect source agent */
             Socket socketSourceAgent = new Socket(sourceHost, sourceAgentPort);
-            ObjectOutputStream outputStreamSourceAgent = new ObjectOutputStream((socketSourceAgent.getOutputStream()));
+            ObjectOutputStream outputStreamSourceAgent = new ObjectOutputStream(new BufferedOutputStream(socketSourceAgent.getOutputStream()));
             ObjectInputStream inputStreamSourceAgent = new ObjectInputStream((socketSourceAgent.getInputStream()));
 
             HashMap<String, Object> hashMap = new HashMap<String, Object>();
@@ -109,7 +110,7 @@ public class ReplicationThread extends Thread {
 
             timestamp = System.currentTimeMillis();
             outputStreamDestinationAgent.writeObject(commandCreate);
-            outputStreamDestinationAgent.reset();
+            outputStreamDestinationAgent.flush();
 
             Object objectCreate = inputStreamDestinationAgent.readObject();
             Return resultCreate = (Return) objectCreate;
@@ -145,7 +146,7 @@ public class ReplicationThread extends Thread {
 
             timestamp = System.currentTimeMillis();
             outputStreamSourceAgent.writeObject(commandDump);
-            outputStreamSourceAgent.reset();
+            outputStreamSourceAgent.flush();
 
             Object objectDump = inputStreamSourceAgent.readObject();
             Return resultDump = (Return) objectDump;
@@ -182,7 +183,7 @@ public class ReplicationThread extends Thread {
 
             timestamp = System.currentTimeMillis();
             outputStreamDestinationAgent.writeObject(commandRestore);
-            outputStreamDestinationAgent.reset();
+            outputStreamDestinationAgent.flush();
 
             Object objectRestore = inputStreamDestinationAgent.readObject();
             Return resultRestore = (Return) objectRestore;

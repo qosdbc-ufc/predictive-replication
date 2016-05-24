@@ -4,6 +4,7 @@
  */
 package qosdbc.coordinator;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -193,24 +194,25 @@ public class QoSDBCConnectionProxy extends Thread {
 
     @Override
     public void run() {
-        //OutputMessage.println("[" + proxyId + "]: Proxy connection starting");
+        OutputMessage.println("[" + proxyId + "]: Proxy connection starting");
         ObjectOutputStream outputStream = null;
         ObjectInputStream inputStream = null;
         boolean proceed = true;
         try {
             outputStream = new ObjectOutputStream(new BufferedOutputStream(dbConnection.getOutputStream()));
-            inputStream = new ObjectInputStream((dbConnection.getInputStream()));
+            outputStream.flush();
+            inputStream = new ObjectInputStream(new BufferedInputStream((dbConnection.getInputStream())));
         } catch (IOException ex) {
             OutputMessage.println("[" + proxyId + "]: Closing proxy connection");
             proceed = false;
         }
-        //OutputMessage.println("[" + proxyId + "]: Proxy connection started");
+        OutputMessage.println("[" + proxyId + "]: Proxy connection started");
 
         boolean closeConnection = false;
         while (proceed && dbConnection != null && dbConnection.isConnected()) {
             try {
 
-               // synchronized (this) { // SYNCHRONIZED
+              //  synchronized (this) { // SYNCHRONIZED
                     if (pause && (lastRequest != null
                             && (lastRequest.getCode() == RequestCode.SQL_COMMIT
                             || lastRequest.getCode() == RequestCode.SQL_ROLLBACK))) {
@@ -227,7 +229,7 @@ public class QoSDBCConnectionProxy extends Thread {
                             OutputMessage.println("[" + proxyId + "]: Error " + ex.getMessage());
                         }
                     }
-             //   } // SYNCHRONIZED
+               // } // SYNCHRONIZED
 
                 if (changeDAO) {
                     try {
@@ -252,16 +254,18 @@ public class QoSDBCConnectionProxy extends Thread {
                     }
                 }
 
+                //OutputMessage.println("br");
                 Object message = inputStream.readObject();
-               // synchronized (this) { // SYNCHRONIZED
+                //OutputMessage.println("ar");
+                //synchronized (this) { // SYNCHRONIZED
                     if (message instanceof Request) {
                         Request msg = (Request) message;
                         Response response = new Response();
 
                         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
-                        // OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
-                        //         + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
+                         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
+                         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
                         switch (msg.getCode()) {
                             case RequestCode.SQL_CONNECTION_CREATE: {
                                 if (dao != null && dao.isActive()) {
@@ -433,7 +437,7 @@ public class QoSDBCConnectionProxy extends Thread {
                             break;
                         }
                     }
-              //  } // SYNCHRONIZED
+               // } // SYNCHRONIZED
             } catch (IOException ex) {
                 OutputMessage.println("[" + proxyId + "] ERROR : Closing proxy connection");
                 ex.printStackTrace();

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package qosdbc.jdbc.driver;
 
 import java.sql.Connection;
@@ -9,13 +5,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.List;
-import qosdbc.commons.jdbc.Request;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import qosdbc.commons.jdbc.RequestCode;
-import qosdbc.commons.jdbc.Response;
-import qosdbc.commons.jdbc.Row;
+import qosdbc.commons.jdbc.QoSDBCMessage.*;
 
 /**
  * 
@@ -38,7 +31,7 @@ public class QoSDBCStatement implements Statement {
 
     public QoSDBCStatement(QoSDBCConnection connection) {
         this.connection = connection;
-        this.id = System.currentTimeMillis();
+        this.id = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
     }
     
     private String treatSQL(String sql) {
@@ -105,62 +98,71 @@ public class QoSDBCStatement implements Statement {
 
     @Override
     public synchronized ResultSet executeQuery(String sql) throws SQLException {
-        // @gabiarra - for ycsb oltpbenchmark - start
-        if (sql != null && sql.indexOf(".USERTABLE.") != -1) {
-            sql = sql.replaceAll(".USERTABLE.", "USERTABLE");
-        }
-        // @gabiarra - for ycsb oltpbenchmark - end
-        Request request = new Request();
-        request.setCode(RequestCode.SQL_RESULTSET_CREATE);
-        request.addParameter("statementId", getStatementID());
-        request.addParameter("resultSetId", System.currentTimeMillis());
-        request.setCommand(sql);
-        request.setDatabase(connection.getDatabaseName());
-        Response response = connection.executeMessage(request);
-        List<Row> resultSetList = (List<Row>) response.getResultObject();
-        if (resultSetList == null || response.getState() != RequestCode.STATE_SUCCESS) {
-            throw new SQLException("Invalid query");
-        }
-        QoSDBCResultSet resultSet = new QoSDBCResultSet(resultSetList,
-                connection,
-                Long.parseLong(request.getParameterValue("resultSetId").toString()),
-                getStatementID());
-        return resultSet;
+      // @gabiarra - for ycsb oltpbenchmark - start
+      if (sql != null && sql.indexOf(".USERTABLE.") != -1) {
+          sql = sql.replaceAll(".USERTABLE.", "USERTABLE");
+      }
+      // @gabiarra - for ycsb oltpbenchmark - end
+      Request.Builder request = Request.newBuilder();
+      request.setCode(RequestCode.SQL_RESULTSET_CREATE);
+      HashMap<String, String> parametersMap = new HashMap<String, String>();
+      parametersMap.put("statementId", String.valueOf(getStatementID()));
+      parametersMap.put("resultSetId", String.valueOf(TimeUnit.NANOSECONDS.toMillis(System.nanoTime())));
+      request.putAllParameters(parametersMap);
+      request.setCommand(sql);
+      request.setDatabase(connection.getDatabaseName());
+      Response response = connection.executeMessage(request);
+      List<Response.Row> resultSetList = response.getResultSetList();
+      if (resultSetList == null || response.getState() != RequestCode.STATE_SUCCESS) {
+          throw new SQLException("Invalid query");
+      }
+      QoSDBCResultSet resultSet = new QoSDBCResultSet(resultSetList,
+              connection,
+              Long.parseLong(request.getParameters().get("resultSetId")),
+              getStatementID());
+      return resultSet;
     }
 
     @Override
     public synchronized int executeUpdate(String sql) throws SQLException {
-        Request request = new Request();
-        if (sql.toLowerCase().startsWith("insert")) {
-            request.setCode(RequestCode.SQL_UPDATE);
-        }
-        if (sql.toLowerCase().startsWith("update")) {
-            request.setCode(RequestCode.SQL_UPDATE);
-        }
-        if (sql.toLowerCase().startsWith("delete")) {
-            request.setCode(RequestCode.SQL_UPDATE);
-        }
-        request.addParameter("statementId", getStatementID());
-        request.setCommand(sql);
-        request.setDatabase(connection.getDatabaseName());
-        Response response = connection.executeMessage(request);
-        long result = Long.parseLong(response.getResultObject().toString());
-        if (result < 0 || response == null || response.getState() != RequestCode.STATE_SUCCESS) {
-            throw new SQLException("Invalid query");
-        }
-        return (int) result;
+      Request.Builder request = Request.newBuilder();
+      if (sql.toLowerCase().startsWith("insert")) {
+          request.setCode(RequestCode.SQL_UPDATE);
+      }
+      if (sql.toLowerCase().startsWith("update")) {
+          request.setCode(RequestCode.SQL_UPDATE);
+      }
+      if (sql.toLowerCase().startsWith("delete")) {
+          request.setCode(RequestCode.SQL_UPDATE);
+      }
+      HashMap<String, String> parametersMap = new HashMap<String, String>();
+      parametersMap.put("statementId", String.valueOf(getStatementID()));
+      request.putAllParameters(parametersMap);
+      request.setCommand(sql);
+      request.setDatabase(connection.getDatabaseName());
+      Response response = connection.executeMessage(request);
+      int result = response.getResultObject();
+      if (result < 0 ||
+          response == null ||
+          response.getState() != RequestCode.STATE_SUCCESS) {
+          throw new SQLException("Invalid query");
+      }
+      return result;
     }
 
     @Override
     public synchronized void close() throws SQLException {
-        Request request = new Request();
-        request.setCode(RequestCode.SQL_STATEMENT_CLOSE);
-        request.addParameter("statementId", getStatementID());
-        request.setDatabase(connection.getDatabaseName());
-        Response response = connection.executeMessage(request);
-        if (response == null || response.getState() == RequestCode.STATE_FAILURE) {
-            throw new SQLException("Failed to close statement");
-        }
+      Request.Builder request = Request.newBuilder();
+      request.setCode(RequestCode.SQL_STATEMENT_CLOSE);
+      HashMap<String, String> parametersMap = new HashMap<String, String>();
+      parametersMap.put("statementId", String.valueOf(getStatementID()));
+      request.putAllParameters(parametersMap);
+      request.setDatabase(connection.getDatabaseName());
+      Response response = connection.executeMessage(request);
+      if (response == null ||
+          response.getState() == RequestCode.STATE_FAILURE) {
+        throw new SQLException("Failed to close statement");
+      }
     }
 
     @Override
@@ -220,26 +222,28 @@ public class QoSDBCStatement implements Statement {
 
     @Override
     public synchronized boolean execute(String sql) throws SQLException {
-        Request request = new Request();
-        sql = sql.trim();
-        request.setDatabase(connection.getDatabaseName());
-        request.addParameter("statementId", getStatementID());
-        request.setCommand(sql);
-        request.setCode(RequestCode.SQL_UPDATE);
-        if (sql.toLowerCase().startsWith("select")) {
-            request.setCode(RequestCode.SQL_RESULTSET_CREATE);
-        }
-        if (sql.toLowerCase().startsWith("insert")) {
-            request.setCode(RequestCode.SQL_UPDATE);
-        }
-        if (sql.toLowerCase().startsWith("update")) {
-            request.setCode(RequestCode.SQL_UPDATE);
-        }
-        if (sql.toLowerCase().startsWith("delete")) {
-            request.setCode(RequestCode.SQL_UPDATE);
-        }
-        Response response = connection.executeMessage(request);
-        return (response != null && Long.parseLong(response.getResultObject().toString()) >= 0);
+      Request.Builder request = Request.newBuilder();
+      sql = sql.trim();
+      request.setDatabase(connection.getDatabaseName());
+      HashMap<String, String> parametersMap = new HashMap<String, String>();
+      parametersMap.put("statementId", String.valueOf(getStatementID()));
+      request.putAllParameters(parametersMap);
+      request.setCommand(sql);
+      request.setCode(RequestCode.SQL_UPDATE);
+      if (sql.toLowerCase().startsWith("select")) {
+          request.setCode(RequestCode.SQL_RESULTSET_CREATE);
+      }
+      if (sql.toLowerCase().startsWith("insert")) {
+          request.setCode(RequestCode.SQL_UPDATE);
+      }
+      if (sql.toLowerCase().startsWith("update")) {
+          request.setCode(RequestCode.SQL_UPDATE);
+      }
+      if (sql.toLowerCase().startsWith("delete")) {
+          request.setCode(RequestCode.SQL_UPDATE);
+      }
+      Response response = connection.executeMessage(request);
+      return (response != null && response.getResultObject() >= 0);
     }
 
     @Override

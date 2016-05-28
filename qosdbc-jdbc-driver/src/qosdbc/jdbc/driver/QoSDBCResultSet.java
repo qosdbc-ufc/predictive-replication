@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package qosdbc.jdbc.driver;
 
 import java.io.InputStream;
@@ -25,15 +21,10 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
-import qosdbc.commons.jdbc.Column;
-import qosdbc.commons.jdbc.Request;
+import java.util.*;
+
+import qosdbc.commons.jdbc.QoSDBCMessage.*;
 import qosdbc.commons.jdbc.RequestCode;
-import qosdbc.commons.jdbc.Response;
-import qosdbc.commons.jdbc.Row;
 
 /**
  *
@@ -41,7 +32,7 @@ import qosdbc.commons.jdbc.Row;
  */
 public class QoSDBCResultSet implements ResultSet {
 
-    private List<Row> resultSetList;
+    private List<Response.Row> resultSetList;
     private int indexCurrent = -1;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.S");
     private QoSDBCResultSetMetaData resultSetMetaData;
@@ -57,7 +48,7 @@ public class QoSDBCResultSet implements ResultSet {
         return resultSetID;
     }
 
-    public QoSDBCResultSet(List<Row> resultSetList, QoSDBCConnection connection, long resultSetID, long statementID) throws SQLException {
+    public QoSDBCResultSet(List<Response.Row> resultSetList, QoSDBCConnection connection, long resultSetID, long statementID) throws SQLException {
         this.resultSetList = resultSetList;
         this.connection = connection;
         this.resultSetID = resultSetID;
@@ -76,17 +67,19 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public void close() throws SQLException {
-        this.resultSetList = new ArrayList<Row>();
-        indexCurrent = -1;
-        Request request = new Request();
-        request.setCode(RequestCode.SQL_RESULTSET_CLOSE);
-        request.addParameter("resultSetId", getResultSetID());
-        request.addParameter("statementId", getStatementID());
-        request.setDatabase(connection.getDatabaseName());
-        Response response = connection.executeMessage(request);
-        if (response == null || response.getState() == RequestCode.STATE_FAILURE) {
-            throw new SQLException("Failed to close result");
-        }
+      this.resultSetList = new ArrayList<Response.Row>();
+      indexCurrent = -1;
+      Request.Builder request = Request.newBuilder();
+      request.setCode(RequestCode.SQL_RESULTSET_CLOSE);
+      HashMap<String, String> parametersMap = new HashMap<String, String>();
+      parametersMap.put("resultSetId", String.valueOf(getResultSetID()));
+      parametersMap.put("statementId", String.valueOf(getStatementID()));
+      request.putAllParameters(parametersMap);
+      request.setDatabase(connection.getDatabaseName());
+      Response response = connection.executeMessage(request);
+      if (response == null || response.getState() == RequestCode.STATE_FAILURE) {
+          throw new SQLException("Failed to close result");
+      }
     }
 
     @Override
@@ -98,11 +91,11 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized String getString(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
+            Response.Row row = resultSetList.get(indexCurrent);
+            if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
                 throw new SQLException("Invalid index");
             }
-            List<Column> columns = row.getColumns();
+            List<Response.Row.Column> columns = row.getColumnListList();
             for (int i = 0; i < columns.size(); i++) {
                 if ((i + 1) == columnIndex) {
                     result = columns.get(i).getColumnValue();
@@ -122,17 +115,17 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized boolean getBoolean(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
-                throw new SQLException("Invalid index");
-            }
-            List<Column> columns = row.getColumns();
-            for (int i = 0; i < columns.size(); i++) {
-                if ((i + 1) == columnIndex) {
-                    result = columns.get(i).getColumnValue();
-                    break;
-                }
-            }
+          Response.Row row = resultSetList.get(indexCurrent);
+          if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
+              throw new SQLException("Invalid index");
+          }
+          List<Response.Row.Column> columns = row.getColumnListList();
+          for (int i = 0; i < columns.size(); i++) {
+              if ((i + 1) == columnIndex) {
+                  result = columns.get(i).getColumnValue();
+                  break;
+              }
+          }
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -146,11 +139,11 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized byte getByte(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
+            Response.Row row = resultSetList.get(indexCurrent);
+            if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
                 throw new SQLException("Invalid index");
             }
-            List<Column> columns = row.getColumns();
+            List<Response.Row.Column> columns = row.getColumnListList();
             for (int i = 0; i < columns.size(); i++) {
                 if ((i + 1) == columnIndex) {
                     result = columns.get(i).getColumnValue();
@@ -170,17 +163,17 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized short getShort(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
-                throw new SQLException("Invalid index");
-            }
-            List<Column> columns = row.getColumns();
-            for (int i = 0; i < columns.size(); i++) {
-                if ((i + 1) == columnIndex) {
-                    result = columns.get(i).getColumnValue();
-                    break;
-                }
-            }
+          Response.Row row = resultSetList.get(indexCurrent);
+          if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
+              throw new SQLException("Invalid index");
+          }
+          List<Response.Row.Column> columns = row.getColumnListList();
+          for (int i = 0; i < columns.size(); i++) {
+              if ((i + 1) == columnIndex) {
+                  result = columns.get(i).getColumnValue();
+                  break;
+              }
+          }
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -194,17 +187,17 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized int getInt(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
-                throw new SQLException("Invalid index");
-            }
-            List<Column> columns = row.getColumns();
-            for (int i = 0; i < columns.size(); i++) {
-                if ((i + 1) == columnIndex) {
-                    result = columns.get(i).getColumnValue();
-                    break;
-                }
-            }
+          Response.Row  row = resultSetList.get(indexCurrent);
+          if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
+              throw new SQLException("Invalid index");
+          }
+          List<Response.Row.Column> columns = row.getColumnListList();
+          for (int i = 0; i < columns.size(); i++) {
+              if ((i + 1) == columnIndex) {
+                  result = columns.get(i).getColumnValue();
+                  break;
+              }
+          }
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -218,11 +211,11 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized long getLong(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
+          Response.Row  row = resultSetList.get(indexCurrent);
+            if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
                 throw new SQLException("Invalid index");
             }
-            List<Column> columns = row.getColumns();
+            List<Response.Row.Column> columns = row.getColumnListList();
             for (int i = 0; i < columns.size(); i++) {
                 if ((i + 1) == columnIndex) {
                     result = columns.get(i).getColumnValue();
@@ -242,11 +235,11 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized float getFloat(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
+          Response.Row row = resultSetList.get(indexCurrent);
+            if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
                 throw new SQLException("Invalid index");
             }
-            List<Column> columns = row.getColumns();
+            List<Response.Row.Column> columns = row.getColumnListList();
             for (int i = 0; i < columns.size(); i++) {
                 if ((i + 1) == columnIndex) {
                     result = columns.get(i).getColumnValue();
@@ -266,11 +259,11 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized double getDouble(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
+          Response.Row  row = resultSetList.get(indexCurrent);
+            if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
                 throw new SQLException("Invalid index");
             }
-            List<Column> columns = row.getColumns();
+            List<Response.Row.Column> columns = row.getColumnListList();
             for (int i = 0; i < columns.size(); i++) {
                 if ((i + 1) == columnIndex) {
                     result = columns.get(i).getColumnValue();
@@ -300,17 +293,17 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized Date getDate(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
-                throw new SQLException("Invalid index");
+          Response.Row  row = resultSetList.get(indexCurrent);
+          if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
+            throw new SQLException("Invalid index");
+          }
+          List<Response.Row.Column> columns = row.getColumnListList();
+          for (int i = 0; i < columns.size(); i++) {
+            if ((i + 1) == columnIndex) {
+              result = columns.get(i).getColumnValue();
+              break;
             }
-            List<Column> columns = row.getColumns();
-            for (int i = 0; i < columns.size(); i++) {
-                if ((i + 1) == columnIndex) {
-                    result = columns.get(i).getColumnValue();
-                    break;
-                }
-            }
+          }
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -330,17 +323,17 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized Time getTime(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
-                throw new SQLException("Invalid index");
+          Response.Row  row = resultSetList.get(indexCurrent);
+          if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
+            throw new SQLException("Invalid index");
+          }
+          List<Response.Row.Column> columns = row.getColumnListList();
+          for (int i = 0; i < columns.size(); i++) {
+            if ((i + 1) == columnIndex) {
+              result = columns.get(i).getColumnValue();
+              break;
             }
-            List<Column> columns = row.getColumns();
-            for (int i = 0; i < columns.size(); i++) {
-                if ((i + 1) == columnIndex) {
-                    result = columns.get(i).getColumnValue();
-                    break;
-                }
-            }
+          }
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -360,17 +353,17 @@ public class QoSDBCResultSet implements ResultSet {
     public synchronized Timestamp getTimestamp(int columnIndex) throws SQLException {
         Object result = null;
         try {
-            Row row = resultSetList.get(indexCurrent);
-            if (columnIndex < 1 || columnIndex > row.size()) {
-                throw new SQLException("Invalid index");
+          Response.Row  row = resultSetList.get(indexCurrent);
+          if (columnIndex < 1 || columnIndex > row.getColumnListCount()) {
+            throw new SQLException("Invalid index");
+          }
+          List<Response.Row.Column> columns = row.getColumnListList();
+          for (int i = 0; i < columns.size(); i++) {
+            if ((i + 1) == columnIndex) {
+              result = columns.get(i).getColumnValue();
+              break;
             }
-            List<Column> columns = row.getColumns();
-            for (int i = 0; i < columns.size(); i++) {
-                if ((i + 1) == columnIndex) {
-                    result = columns.get(i).getColumnValue();
-                    break;
-                }
-            }
+          }
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -403,18 +396,18 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized String getString(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
-        if (result == null) {
-            return null;
-        }
-        return String.valueOf(result);
+      Response.Row row = resultSetList.get(indexCurrent);
+      Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
+      if (result == null) {
+          return null;
+      }
+      return String.valueOf(result);
     }
 
     @Override
     public synchronized boolean getBoolean(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return false;
         }
@@ -423,8 +416,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized byte getByte(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return 0;
         }
@@ -433,8 +426,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized short getShort(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return 0;
         }
@@ -443,8 +436,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized int getInt(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return 0;
         }
@@ -453,8 +446,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized long getLong(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return 0;
         }
@@ -463,8 +456,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized float getFloat(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return 0;
         }
@@ -473,8 +466,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized double getDouble(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return 0;
         }
@@ -493,8 +486,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized Date getDate(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return null;
         }
@@ -510,8 +503,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized Time getTime(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return null;
         }
@@ -527,8 +520,8 @@ public class QoSDBCResultSet implements ResultSet {
 
     @Override
     public synchronized Timestamp getTimestamp(String columnLabel) throws SQLException {
-        Row row = resultSetList.get(indexCurrent);
-        Object result = row.getColumnValueByColumnLabel(columnLabel);
+      Response.Row row = resultSetList.get(indexCurrent);
+        Object result = getColumnValueByColumnLabel(row.getColumnListList(), columnLabel);
         if (result == null) {
             return null;
         }
@@ -1336,4 +1329,32 @@ public class QoSDBCResultSet implements ResultSet {
     public <T> T getObject(String string, Class<T> type) throws SQLException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+
+  private Object getColumnValueByColumnLabel(List<Response.Row.Column> columnList,
+                                            String columnLabel) throws SQLException {
+    boolean found = false;
+    Object result = null;
+    for (Response.Row.Column c : columnList) {
+      if (c.getColumnLabel().equalsIgnoreCase(columnLabel)) {
+        result = c.getColumnValue();
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      throw new SQLException("Column not found (" + columnLabel + "). All column labels: " + getAllColumnLabels(columnList));
+    }
+    return result;
+  }
+
+  private String getAllColumnLabels(List<Response.Row.Column> columnList) {
+    String result = "";
+    for (Response.Row.Column c : columnList) {
+      result += c.getColumnLabel() + ", ";
+    }
+    if (result.endsWith(", ")) {
+      result = result.substring(0, result.length() - ", ".length());
+    }
+    return result;
+  }
 }

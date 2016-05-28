@@ -1,14 +1,9 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package qosdbc.jdbc.driver;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.List;
-import qosdbc.commons.jdbc.Column;
-import qosdbc.commons.jdbc.Row;
+import qosdbc.commons.jdbc.QoSDBCMessage.*;
 
 /**
  *
@@ -16,9 +11,9 @@ import qosdbc.commons.jdbc.Row;
  */
 public class QoSDBCResultSetMetaData implements ResultSetMetaData {
 
-    private List<Row> resultSetList;
+    private List<Response.Row> resultSetList;
     
-    public QoSDBCResultSetMetaData(List<Row> resultSetList) {
+    public QoSDBCResultSetMetaData(List<Response.Row > resultSetList) {
         this.resultSetList = resultSetList;
     }        
     
@@ -26,8 +21,8 @@ public class QoSDBCResultSetMetaData implements ResultSetMetaData {
     public int getColumnCount() throws SQLException {
         if (resultSetList == null || resultSetList.size() == 0)
             return 0;
-        Row row = resultSetList.get(0);
-        return row.size();
+        Response.Row row = resultSetList.get(0);
+        return row.getColumnListCount();
     }
 
     @Override
@@ -69,11 +64,11 @@ public class QoSDBCResultSetMetaData implements ResultSetMetaData {
     public String getColumnLabel(int i) throws SQLException {
         if (resultSetList == null || resultSetList.size() == 0)
             return null;
-        Row row = resultSetList.get(0);        
-        if (i < 1 || i > row.size()) {
+        Response.Row row = resultSetList.get(0);
+        if (i < 1 || i > row.getColumnListCount()) {
             throw new SQLException("Invalid index");
         }
-        List<Column> columns = row.getColumns();
+        List<Response.Row.Column> columns = row.getColumnListList();
         for (int j = 0; j < columns.size(); j++) {
             if ((j + 1) == i) {
                 return columns.get(j).getColumnLabel();
@@ -86,11 +81,11 @@ public class QoSDBCResultSetMetaData implements ResultSetMetaData {
     public String getColumnName(int i) throws SQLException {
         if (resultSetList == null || resultSetList.size() == 0)
             return null;
-        Row row = resultSetList.get(0);        
-        if (i < 1 || i > row.size()) {
+        Response.Row row = resultSetList.get(0);
+        if (i < 1 || i > row.getColumnListCount()) {
             throw new SQLException("Invalid index");
         }
-        List<Column> columns = row.getColumns();
+        List<Response.Row.Column> columns = row.getColumnListList();
         for (int j = 0; j < columns.size(); j++) {
             if ((j + 1) == i) {
                 return columns.get(j).getColumnLabel();
@@ -128,12 +123,12 @@ public class QoSDBCResultSetMetaData implements ResultSetMetaData {
     public int getColumnType(int i) throws SQLException {
         if (resultSetList == null || resultSetList.size() == 0)
             return java.sql.Types.NULL;
-        Row row = resultSetList.get(0);        
-        if (i < 1 || i > row.size()) {
+        Response.Row row = resultSetList.get(0);
+        if (i < 1 || i > row.getColumnListCount()) {
             throw new SQLException("Invalid index");
         }
         Object result = null;
-        List<Column> columns = row.getColumns();
+        List<Response.Row.Column> columns = row.getColumnListList();
         for (int j = 0; j < columns.size(); j++) {
             if ((j + 1) == i) {
                 result = columns.get(j).getColumnValue();

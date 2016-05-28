@@ -123,7 +123,7 @@ public class QoSDBCForecaster extends Thread {
      */
     private double[] getSeries() {
         long currentTime = System.currentTimeMillis();
-        ArrayList<Double> responseTimes = new ArrayList<>();
+        ArrayList<Double> responseTimes = new ArrayList<Double>();
        // String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
        //         "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 

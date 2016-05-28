@@ -26,7 +26,11 @@
   </build>
 
   <dependencies>
-    
+    <dependency>
+      <groupId>qosdbc-commons</groupId>
+      <artifactId>qosdbc-commons</artifactId>
+      <version>0.0.1</version>
+    </dependency>
   </dependencies>
 
 </project>

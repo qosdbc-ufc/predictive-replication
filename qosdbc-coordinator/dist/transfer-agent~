@@ -1,6 +1,0 @@
-#!/bin/bash
-
-scp qosdbc-coordinator.jar lsbd@10.102.22.167:/home/lsbd/coordinator
-scp -r lib lsbd@10.102.22.167:/home/lsbd/coordinator
-scp qosdbc-coordinator.properties lsbd@10.102.22.167:/home/lsbd/coordinator
-

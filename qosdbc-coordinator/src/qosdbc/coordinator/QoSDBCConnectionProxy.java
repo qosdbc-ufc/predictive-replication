@@ -230,11 +230,11 @@ public class QoSDBCConnectionProxy extends Thread {
           }
         }
 
-        //synchronized (this) { // SYNCHRONIZED
+        // synchronized (this) { // SYNCHRONIZED
         // reads the request from the stream
         Request msg = Request.parseDelimitedFrom(inputStream);
         Response.Builder response = Response.newBuilder();
-        
+
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());

@@ -123,8 +123,9 @@ public class QoSDBCService extends Thread {
         OutputMessage.println("QoSDBC Service is running");
         while (serverSocket != null && !serverSocket.isClosed()) {
             try {
-                Socket dbConnection = serverSocket.accept();
-                QoSDBCConnectionProxy connectionProxy = 
+              Socket dbConnection = serverSocket.accept();
+              dbConnection.setTcpNoDelay(true);
+              QoSDBCConnectionProxy connectionProxy =
                         new QoSDBCConnectionProxy(  this, 
                                                     dbConnection, 
                                                     catalogConnection, 

@@ -6,13 +6,7 @@
 package qosdbc.coordinator;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.*;
 import qosdbc.commons.OutputMessage;
 
 /**
@@ -20,80 +14,61 @@ import qosdbc.commons.OutputMessage;
  */
 public class QoSDBCLoadBalancer {
     
-    // HashTable Master -> Current Replica(most recent replica to receive a workload)
-    private Map<String, String> currentReplicaTable = null;
+  // dbName => list(jdbc connections)
+  private HashMap<String, List<Connection>> tenantMap = null;
+  // dbName => currentTarget
+  private HashMap<String, Integer> targetMap = null;
     
-    public QoSDBCLoadBalancer() {
-        currentReplicaTable = new ConcurrentHashMap<String, String>();
+  public QoSDBCLoadBalancer() {
+    tenantMap = new HashMap<String, List<Connection>>();
+    targetMap = new HashMap<String, Integer>();
+  }
+
+  public Connection getTarget(String dbName) {
+    if (!tenantMap.containsKey(dbName)) {
+      OutputMessage.println("[LoadBalancer] ERROR - There is no dbName = "
+          + dbName + " monitored. Could not get connection to it.");
+      return null;
     }
-    
-    public String getCurrentVmId(String vmId) {
-        if (currentReplicaTable.containsKey(vmId)) {
-            return currentReplicaTable.get(vmId);
+    List<Connection> connectionList = tenantMap.get(dbName);
+    if (connectionList.size() == 1) {
+      targetMap.put(dbName, 0);
+      return connectionList.get(0);
+    }
+    int currentIndex = targetMap.get(dbName);
+    if (currentIndex == connectionList.size()-1) {
+      currentIndex = 0;
+    } else {
+      currentIndex++;
+    }
+    targetMap.put(dbName, currentIndex);
+    return connectionList.get(currentIndex);
+  }
+
+  public void addTenant(String dbName, Connection conn) {
+    if(!tenantMap.containsKey(dbName)) {
+      List<Connection> connectionList = new ArrayList<Connection>();
+      synchronized (connectionList) {
+        connectionList.add(conn);
+      }
+    }
+  }
+
+  public void addReplica(String dbName, Connection conn) {
+    if (tenantMap.containsKey(dbName)) {
+        List<Connection> connectionList = tenantMap.get(dbName);
+        synchronized (connectionList) {
+          connectionList.add(conn);
         }
-        return null;
     }
-    
-    /**
-     * 
-     * @param vmId 
-     */
-    public void addMaster(String vmId) {
-        if (!currentReplicaTable.containsKey(vmId)) {
-            OutputMessage.println("[LoadBalancer]: Added master: " + vmId);
-            currentReplicaTable.put(vmId, vmId);
-        }
+  }
+
+  public void removeReplica(String dbName, Connection conn) {
+    if (tenantMap.containsKey(dbName)) {
+      List<Connection> connectionList = tenantMap.get(dbName);
+      synchronized (connectionList) {
+        connectionList.remove(conn);
+      }
     }
-    
-    /**
-     * 
-     * @param vmId
-     * @return 
-     */
-    public String removeMaster(String vmId) {
-        OutputMessage.println("[LoadBalancer]: removed master: " + vmId);
-        return currentReplicaTable.remove(vmId);
-    }
-    
-    /**
-     * 
-     * @param catalogConnection
-     * @param dbName Name of the database
-     * @param vmId VM Id in which the database master is in
-     * @return replicaVmId
-     */
-    public String targetReplica(Connection catalogConnection, String dbName, String vmId) {
-        // default target to receive workload is the master
-        // OutputMessage.println("[LoadBalancer]: Current: " + currentReplicaTable.get(vmId));
-        String targetReplica = vmId;
-        try {
-            Statement statement = catalogConnection.createStatement();
-            // selects all the replicas from the replicas table 
-            ResultSet resultSet = statement.executeQuery("SELECT vm_id FROM db_active_replica WHERE master='" + vmId + "/" + dbName + "'");
-            while (resultSet.next()) {
-                String replicaVmId = resultSet.getString("vm_id");
-                // OutputMessage.println("[LoadBalancer]: Queried: " + replicaVmId);
-                // the current target replica is the master
-                if (currentReplicaTable.get(vmId).equals(vmId)) {
-                    targetReplica = replicaVmId;
-                    break;
-                } else if (currentReplicaTable.get(vmId).equals(replicaVmId)) {
-                    if (resultSet.next()) {
-                        replicaVmId = resultSet.getString("vm_id");
-                        targetReplica = replicaVmId;
-                        break;
-                    }
-                }
-            }
-            resultSet.close();
-            statement.close();
-        } catch (SQLException ex) {
-            OutputMessage.println("[LoadBalancer]: ERROR on selecting next target for " + vmId + "/" + dbName);
-            Logger.getLogger(QoSDBCLoadBalancer.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        // updates the most recent replica that has processed a workload
-        currentReplicaTable.put(vmId, targetReplica);
-        // OutputMessage.println("[LoadBalancer]: selected Target ip: " + targetReplica + "/" + dbName);
-        return targetReplica;
-    }
+  }
 }

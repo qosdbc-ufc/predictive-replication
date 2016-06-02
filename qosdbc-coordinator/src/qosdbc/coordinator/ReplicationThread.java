@@ -16,6 +16,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
+
 import qosdbc.commons.OutputMessage;
 import qosdbc.commons.command.Command;
 import qosdbc.commons.command.CommandCode;
@@ -32,15 +34,17 @@ public class ReplicationThread extends Thread {
     private Connection catalogConnection;
     private Connection logConnection;
     private QoSDBCService qosdbcService;
+    private QoSDBCLoadBalancer loadBalancer;
 
     public ReplicationThread(Command command, 
             Connection catalogConnection, 
             Connection logConnection, 
-            QoSDBCService qosdbcService) {
+            QoSDBCService qosdbcService , QoSDBCLoadBalancer loadBalancer) {
         this.command = command;
         this.catalogConnection = catalogConnection;
         this.logConnection = logConnection;
         this.qosdbcService = qosdbcService;
+        this.loadBalancer = loadBalancer;
     }
 
     @Override
@@ -85,7 +89,7 @@ public class ReplicationThread extends Thread {
             ex.printStackTrace();
         }
         try {
-            long startTime = System.currentTimeMillis();
+            long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             long timestamp = 0;
 
             /* Socket to connect destination agent */
@@ -108,7 +112,7 @@ public class ReplicationThread extends Thread {
             commandCreate.setCode(CommandCode.DATABASE_CREATE);
             commandCreate.setParameters(hashMap);
 
-            timestamp = System.currentTimeMillis();
+            timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             outputStreamDestinationAgent.writeObject(commandCreate);
             outputStreamDestinationAgent.flush();
 
@@ -127,12 +131,12 @@ public class ReplicationThread extends Thread {
             }
             OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Create Database "
                     + (resultCreate.getState() == CommandCode.STATE_SUCCESS ? "[OK]" : "[FAILURE]")
-                    + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                    + " " + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
             /* Create database into destination agent - End */
 
             /* Pause all connection proxies of the database - Begin */
             OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: PAUSE (BEFORE DUMP) " + "START");
-            long logStartTime = System.currentTimeMillis();
+            long logStartTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             qosdbcService.setInMigration(databaseName, true);
             qosdbcService.pauseDatabaseConnections(databaseName);
             OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: PAUSE (BEFORE DUMP) " + "END");
@@ -144,7 +148,7 @@ public class ReplicationThread extends Thread {
             commandDump.setParameters(hashMap);
             commandDump.toString();
 
-            timestamp = System.currentTimeMillis();
+            timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             outputStreamSourceAgent.writeObject(commandDump);
             outputStreamSourceAgent.flush();
 
@@ -165,7 +169,7 @@ public class ReplicationThread extends Thread {
             }
             OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Dump Database "
                     + (resultDump.getState() == CommandCode.STATE_SUCCESS ? "[OK]" : "[FAILURE]")
-                    + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                    + " " + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
             /* Generate dump database file in source agent - End */
 
             /* Play all paused connection proxies of the database - Begin */
@@ -181,7 +185,7 @@ public class ReplicationThread extends Thread {
             hashMap.put("dumpFileURL", dumpFileURL);
             commandRestore.setParameters(hashMap);
 
-            timestamp = System.currentTimeMillis();
+            timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             outputStreamDestinationAgent.writeObject(commandRestore);
             outputStreamDestinationAgent.flush();
 
@@ -200,7 +204,7 @@ public class ReplicationThread extends Thread {
             }
             OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Restore Database "
                     + (resultRestore.getState() == CommandCode.STATE_SUCCESS ? "[OK]" : "[FAILURE]") + " "
-                    + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                    + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
             /* Restore database in destination agent - Begin */
 
 
@@ -213,7 +217,7 @@ public class ReplicationThread extends Thread {
                     + "]: PAUSE (BEFORE UPDATES INFORMATION AND PROPAGATES UPDATE QUERIES) " + "END");
             /* Pause all connection proxies of the database - End */
 
-            timestamp = System.currentTimeMillis();
+            timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             try {
                 Connection databaseConnection = DriverManager.getConnection("jdbc:mysql://"
                         + destinationHost + ":" + 3306 + "/" + databaseName, "root", "ufc123");
@@ -242,13 +246,13 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Propagate Log Update Query Success\n");
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[OK]" + " "
-                        + ((System.currentTimeMillis() - timestamp) / 1000) + " secs" + " (" + count + ") records propagated");
+                        + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs" + " (" + count + ") records propagated");
             } catch (SQLException ex) {
                 System.out.println(ex.getMessage());
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Propagate Log Update Query Failure\n");
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[FAILURE]" + " "
-                        + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                        + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
             }
 
             
@@ -269,7 +273,7 @@ public class ReplicationThread extends Thread {
 
             
             /* Update database information in db_active and db_state - Begin */
-            timestamp = System.currentTimeMillis();
+            timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             try {
                 // Migrating option
                 //String sqlDbActive = "UPDATE db_active SET vm_id = '" + destinationHost + "' WHERE vm_id = '" + sourceHost + "' AND db_name = '" + databaseName + "'";
@@ -281,32 +285,40 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: " + sqlDbActiveReplica);
                 Statement statement = catalogConnection.createStatement();
                 int dbActiveReplica = statement.executeUpdate(sqlDbActiveReplica);
+                this.loadBalancer.addReplica(databaseName,
+                        new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + destinationHost + ":3306/" +
+                                databaseName,
+                                databaseName,
+                                "root",
+                                "ufc123",
+                                destinationHost,
+                                loadBalancer.isAutoCommit(databaseName)));
                 // int dbState = statement.executeUpdate(sqlDbState);
                 statement.close();
                 if (dbActiveReplica > 0) {
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Catalog Information update - Success!\n");
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                             + "]: Database replica insertion into db_active_replica " + "[OK]" + " "
-                            + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                            + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
                 } else {
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Catalog Information update - Failure\n");
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                             + "]: Database replica insertion into db_active_replica " + "[FAILURE]"
-                            + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                            + " " + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
                 }
             } catch (SQLException ex) {
                 System.out.println(ex.getMessage());
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Update Catalog Information Failure\n");
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Database replica insert into db_active_replica " + "[FAILURE]"
-                        + " " + ((System.currentTimeMillis() - timestamp) / 1000) + " secs");
+                        + " " + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
             }
             /* Update database information in db_active and db_state - End */
             
             
             socketDestinationAgent.close();
             socketSourceAgent.close();
-            long endTime = System.currentTimeMillis();
+            long endTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                     + "]: MIGRATION TOTAL TIME " + ((endTime - startTime) / 1000) + " secs");
         } catch (IOException ex) {

@@ -6,14 +6,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.List;
+import java.sql.*;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
@@ -42,6 +36,8 @@ public class QoSDBCConnectionProxy extends Thread {
   private boolean lastRequestWasCommitOrRollback = false;
   private boolean inMigration = false;
   private boolean flagMigration = false;
+  private List<String> tempLog;
+  private boolean balance = false;
 
   /**
    *
@@ -64,6 +60,7 @@ public class QoSDBCConnectionProxy extends Thread {
     this.qosdbcLoadBalancer = qosdbcLoadBalancer;
     statementList = new Hashtable<Long, Statement>();
     resultSetList = new Hashtable<Long, ResultSet>();
+    tempLog = new ArrayList<String>();
   }
 
   /**
@@ -79,21 +76,13 @@ public class QoSDBCConnectionProxy extends Thread {
       while (resultSet.next()) {
         int dbmsType = resultSet.getInt("dbms_type");
         String vmId = resultSet.getString("vm_id");
-        // adds this master if it is not registered yet
-        String replicaVmId;
-        if (IsValidTenant(dbName)) {
-          qosdbcLoadBalancer.addMaster(vmId);
-          // gets the replica to process the current request
-          replicaVmId = qosdbcLoadBalancer.targetReplica(catalogConnection, dbName, vmId);
-        } else {
-          replicaVmId = vmId;
-        }
+
         switch (dbmsType) {
           case DatabaseSystem.TYPE_MYSQL: {
             if (dao != null) {
-              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, dao.getConnection().getAutoCommit());
+              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, dao.getConnection().getAutoCommit());
             } else {
-              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + replicaVmId + ":3306/" + dbName, dbName, "root", "ufc123", replicaVmId, true);
+              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
             }
             foundDatabase = true;
             break;
@@ -106,10 +95,11 @@ public class QoSDBCConnectionProxy extends Thread {
         }
         if (dao.isActive() && foundDatabase) {
           databaseName = dbName;
-          //OutputMessage.println(dbName + " in " + replicaVmId + " is connected");
+          qosdbcLoadBalancer.addTenant(dbName, dao);
+          OutputMessage.println(dbName + " in " + vmId + " is connected");
           return dao;
         } else {
-          OutputMessage.println(dbName + " in " + replicaVmId + " is not connected");
+          OutputMessage.println(dbName + " in " + vmId + " is not connected");
           OutputMessage.println("It will try again...");
           //System.exit(0);
         }
@@ -210,6 +200,7 @@ public class QoSDBCConnectionProxy extends Thread {
         if (changeDAO) {
           try {
             boolean autoCommit = dao.getConnection().getAutoCommit();
+            OutputMessage.println("[" + proxyId + "]: changeDAO ");
             dao = getDatabaseProxy(databaseName);
             //OutputMessage.println("[" + proxyId + "]: Trying to get a dao...");
             //OutputMessage.println("[" + proxyId + "]: GOT IT");
@@ -238,20 +229,32 @@ public class QoSDBCConnectionProxy extends Thread {
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
+        if (balance && IsValidTenant(msg.getDatabase())) {
+          dao = qosdbcLoadBalancer.getTarget(msg.getDatabase());
+          balance = false;
+        }
         switch (msg.getCode()) {
           case RequestCode.SQL_CONNECTION_CREATE: {
             if (dao != null && dao.isActive()) {
+              OutputMessage.println("[" + proxyId + "]: close connection on create new!");
               dao.close();
             }
             dao = getDatabaseProxy(msg.getDatabase());
-            // OutputMessage.println("[" + proxyId + "]: GOT IT");
+            OutputMessage.println("[" + proxyId + "]: GOT IT");
             response.setState(RequestCode.STATE_SUCCESS);
             break;
           }
           case RequestCode.SQL_CONNECTION_CLOSE: {
+            UpdateLogThread thread = updateLog();
+            try {
+              thread.join();
+            } catch (InterruptedException e) {
+              e.printStackTrace();
+            }
             dao.rollback();
             if (dao != null && dao.isActive()) {
-              dao.close();
+              //dao.close();
+              qosdbcLoadBalancer.removeReplica(msg.getDatabase());
             }
             closeConnection = true;
             response.setState(RequestCode.STATE_SUCCESS);
@@ -261,7 +264,7 @@ public class QoSDBCConnectionProxy extends Thread {
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               if (dao.getConnection().getAutoCommit()) {
-                // changeDAO = true;
+                balance = true;
               }
               Statement statement = dao.getConnection().createStatement(); // AO MUDAR O DAO, ESTAMOS PERDENDO OS STATEMENTS
               statement.setEscapeProcessing(false);
@@ -322,20 +325,18 @@ public class QoSDBCConnectionProxy extends Thread {
           case RequestCode.SQL_COMMIT: {
             dao.commit();
             if (!dao.getConnection().getAutoCommit()) {
-              //changeDAO = true;
+              balance = true;
             }
             response.setState(RequestCode.STATE_SUCCESS);
-            //dao.close();
             break;
           }
           case RequestCode.SQL_ROLLBACK: {
-            //OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
+            OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
             dao.rollback();
             if (!dao.getConnection().getAutoCommit()) {
-              //changeDAO = true;
+              balance = true;
             }
             response.setState(RequestCode.STATE_SUCCESS);
-            //dao.close();
             break;
           }
           case RequestCode.SQL_UPDATE: {
@@ -387,7 +388,13 @@ public class QoSDBCConnectionProxy extends Thread {
               OutputMessage.println("[" + proxyId + "]: ERROR while rollbacking on log!");
             }
           } else {
-            log(msg.getCommand(), dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime), msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(), response.getAffectedRows(), flagMigration);
+            String command = msg.getCommand();
+            if (msg.getCode() == RequestCode.SQL_COMMIT) {
+              command = "COMMIT";
+            } else if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
+              command = "ROLLBACK";
+            }
+            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime), msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(), response.getAffectedRows(), flagMigration);
           }
         }
 
@@ -432,7 +439,8 @@ public class QoSDBCConnectionProxy extends Thread {
       } // TRY
     } // WHILE
     // Close all database connections
-    dao.close();
+    //qosdbcLoadBalancer.removeReplica(this.databaseName, dao);
+    //dao.close();
     qosdbcService.removeConnectionProxy(this);
     // OutputMessage.println("[" + proxyId + "]: Proxy connection ended");
     //pw.close();
@@ -468,20 +476,16 @@ public class QoSDBCConnectionProxy extends Thread {
    *
    * @param sql
    */
-  private void log(String sql, String vmId, String dbName, int requestCode, long responseTime, long slaResponseTime, long connectionId, long transactionId, long affectedRows, boolean inMigration) {
+  private void log(String sql, String vmId, String dbName, int requestCode, long responseTime, long slaResponseTime,
+                   long connectionId, long transactionId, long affectedRows, boolean inMigration) {
+
     if (sql != null) {
       sql = sql.replaceAll("[\']", "''");
     }
-    String sqlLog = ""
-        + "INSERT INTO sql_log(\"time\", vm_id, db_name, time_local, sql, sql_type, response_time, sla_response_time, sla_violated, connection_id, transaction_id, affected_rows, in_migration) "
-        + "VALUES (now(), '" + vmId + "', '" + dbName + "', " + System.currentTimeMillis() + ", '" + sql + "', " + requestCode + ", " + responseTime + ", " + slaResponseTime + ", " + (responseTime > slaResponseTime) + ", " + connectionId + ", " + transactionId + ", " + affectedRows + ", " + inMigration + ")";
-    try {
-      Statement statement = logConnection.createStatement();
-      statement.executeUpdate(sqlLog);
-      statement.close();
-    } catch (SQLException ex) {
-      OutputMessage.println("ERROR: " + ex.getMessage());
-    }
+
+    String sqlLog = "(" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + " , '" + vmId + "', '" + dbName + "', " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + ", '" + sql + "', " + requestCode + ", " + responseTime + ", " + slaResponseTime + ", " + (responseTime > slaResponseTime) + ", " + connectionId + ", " + transactionId + ", " + affectedRows + ", " + inMigration + ")";
+    tempLog.add(sqlLog);
+    if(tempLog.size() % 500 == 0) updateLog();
   }
 
   public QoSDBCDatabaseProxy getCurrentDAO() {
@@ -492,5 +496,18 @@ public class QoSDBCConnectionProxy extends Thread {
     return !dbName.equals("information_schema")
         && !dbName.equals("mysql")
         && !dbName.equals("performance_schema");
+  }
+
+  public UpdateLogThread updateLog() {
+    //OutputMessage.println("Logging: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
+    List<String> copy;
+    synchronized (tempLog) {
+      copy = new ArrayList<String>(tempLog.size()+1);
+      copy.addAll(tempLog);
+      tempLog.clear();
+    }
+    UpdateLogThread updateLogThread = new UpdateLogThread(copy, this.logConnection);
+    updateLogThread.run();
+    return updateLogThread;
   }
 }

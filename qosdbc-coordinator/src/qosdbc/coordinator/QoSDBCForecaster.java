@@ -12,6 +12,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
 import qosdbc.commons.command.Command;
@@ -59,7 +61,7 @@ public class QoSDBCForecaster extends Thread {
     @Override
     public void run() {
         OutputMessage.println("[QoSDBCForecaster("+vmId+"/"+dbname+")]Forecasting running...");
-        startTime = System.currentTimeMillis();
+        startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
         while (runThread) {
             try {
@@ -116,13 +118,60 @@ public class QoSDBCForecaster extends Thread {
         }
     }
 
+    private void doSlaLog(long currentTime) {
+        int ret = this.qosdbcService.updateLog();
+        if (ret == -1) {
+            OutputMessage.println("ERROR -  qosdbcService could not update log!");
+        }
+        ArrayList<Double> responseTimes = new ArrayList<Double>();
+        String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
+                "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
+        //String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
+        //        "' AND db_name = '" + dbname + "';";
+        OutputMessage.println(sql);
+        try {
+            Statement statement = logConnection.createStatement();
+            ResultSet resultSet = statement.executeQuery(sql);
+            startTime = currentTime;
+            while (resultSet.next()) {
+                double rt = resultSet.getDouble("response_time");
+                responseTimes.add(rt);
+            }
+        } catch (SQLException ex) {
+            OutputMessage.println("ERROR -  Could not query response times from Log");
+        }
+        logSla(filterData(responseTimes));
+    }
+
+    private void logSla(double[] rts) {
+        String sql = "INSERT INTO sla_log (db_name, response_time) VALUES ";
+        for (int i=0; i<rts.length; i++) {
+            sql += "('" + dbname + "', " + rts[i] + ")";
+            if (i != rts.length - 1) sql += ", ";
+        }
+        try {
+            Statement statement = logConnection.createStatement();
+            statement.executeUpdate(sql);
+            statement.close();
+        } catch (SQLException ex) {
+            OutputMessage.println("ERROR: " + ex.getMessage());
+        }
+    }
+
+
+
     /**
      * It queries response times within the last 30 seconds
      *
      * @return time series
      */
     private double[] getSeries() {
-        long currentTime = System.currentTimeMillis();
+        int ret = this.qosdbcService.updateLog();
+        if (ret == -1) {
+            OutputMessage.println("ERROR -  qosdbcService could not update log!");
+        }
+        long currentTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+        doSlaLog(currentTime);
         ArrayList<Double> responseTimes = new ArrayList<Double>();
        // String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
        //         "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
@@ -226,13 +275,13 @@ public class QoSDBCForecaster extends Thread {
         ReplicationThread replicationThread = new ReplicationThread(command,
                                                                     catalogConnection, 
                                                                     logConnection, 
-                                                                    qosdbcService);
+                                                                    qosdbcService,
+                                                                    qosdbcService.getLoadBalancer());
         replicationThread.start();
         numberOfReplicas++;
     }
     
     private boolean shouldCreateReplica(double futureResponseTime) {
-        if (numberOfReplicas > 0) return false;
         return futureResponseTime > sla;
     }
     

@@ -33,7 +33,7 @@ SET default_with_oids = false;
 --
 
 CREATE TABLE sql_log (
-    "time" time without time zone,
+    "time" bigint,
     vm_id character varying,
     db_name character varying,
     sql character varying,
@@ -50,6 +50,18 @@ CREATE TABLE sql_log (
 
 
 ALTER TABLE public.sql_log OWNER TO postgres;
+
+--
+-- Name: sla_log; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+--
+
+CREATE TABLE sla_log (
+    db_name character varying,
+    response_time double precision
+);
+
+
+ALTER TABLE public.sla_log OWNER TO postgres;
 
 --
 -- Name: public; Type: ACL; Schema: -; Owner: postgres

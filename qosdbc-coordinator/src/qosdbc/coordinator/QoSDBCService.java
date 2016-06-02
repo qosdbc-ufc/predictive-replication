@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import qosdbc.commons.DatabaseSystem;
@@ -38,6 +41,8 @@ public class QoSDBCService extends Thread {
     private QoSDBCLoadBalancer qosdbcLoadBalancer = null;
     private QoSDBCForecaster qosdbcForecaster = null;
     HashMap<String, QoSDBCForecaster> forecastingThreads = null;
+    HashMap<String, ReactiveReplicationThread> reactiveReplicThreads = null;
+    private boolean REACTIVE = true;
 
     public QoSDBCService(int qosdbcPort, Connection catalogConnection, Connection logConnection) {
         this.qosdbcPort = qosdbcPort;
@@ -46,7 +51,8 @@ public class QoSDBCService extends Thread {
         connectionProxies = new ArrayList<QoSDBCConnectionProxy>();
         qosdbcLoadBalancer = new QoSDBCLoadBalancer();
         forecastingThreads = new HashMap<String, QoSDBCForecaster>();
-        
+        reactiveReplicThreads = new  HashMap<String, ReactiveReplicationThread>();
+
         OutputMessage.println("QoSDBC Service is starting");
         try {
             serverSocket = new ServerSocket(qosdbcPort);
@@ -55,13 +61,13 @@ public class QoSDBCService extends Thread {
             serverSocket = null;
         }
         try {
-            
+
             Properties prop = new Properties();
             InputStream propInput = null;
             String fileProperties = System.getProperty("user.dir") + System.getProperty("file.separator") + "sla.properties";
             propInput = new FileInputStream(fileProperties);
             prop.load(propInput);
-            
+
             Statement statement = catalogConnection.createStatement();
             ResultSet resultSet = statement.executeQuery("SELECT \"time\", vm_id, db_name, dbms_type from db_active");
             while (resultSet.next()) {
@@ -69,27 +75,38 @@ public class QoSDBCService extends Thread {
                 int dbmsType = resultSet.getInt("dbms_type");
                 String vmId = resultSet.getString("vm_id");
                 QoSDBCDatabaseProxy databaseProxy = null;
-                QoSDBCForecaster qosdbcForecaster = null;
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
-                        if (!dbName.equals("information_schema") && 
-                            !dbName.equals("mysql") && 
-                            !dbName.equals("performance_schema")) {
-                            qosdbcForecaster = new QoSDBCForecaster(logConnection,
-                                    catalogConnection,
-                                    this,
-                                    Integer.parseInt(prop.getProperty(dbName+"_pinterval")),
-                                    vmId,
-                                    dbName,
-                                    Double.parseDouble(prop.getProperty(dbName+"_sla")));
-                            qosdbcForecaster.start();
-                            forecastingThreads.put(vmId+dbName, qosdbcForecaster);
+                        if (!dbName.equals("information_schema") &&
+                                !dbName.equals("mysql") &&
+                                !dbName.equals("performance_schema")) {
+                            if (!REACTIVE) {
+                                ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(logConnection,
+                                        catalogConnection,
+                                        this,
+                                        Integer.parseInt(prop.getProperty(dbName + "_pinterval")),
+                                        vmId,
+                                        dbName,
+                                        Double.parseDouble(prop.getProperty(dbName + "_sla")));
+                                reactiveReplicThread.start();
+                                reactiveReplicThreads.put(vmId + dbName, reactiveReplicThread);
+                            } else {
+                                QoSDBCForecaster qosdbcForecaster = new QoSDBCForecaster(logConnection,
+                                        catalogConnection,
+                                        this,
+                                        Integer.parseInt(prop.getProperty(dbName + "_pinterval")),
+                                        vmId,
+                                        dbName,
+                                        Double.parseDouble(prop.getProperty(dbName + "_sla")));
+                                qosdbcForecaster.start();
+                                forecastingThreads.put(vmId + dbName, qosdbcForecaster);
+                            }
                         }
                         break;
                     }
                     case DatabaseSystem.TYPE_POSTGRES: {
-                       // databaseProxy = new QoSDBCDatabaseProxy("org.postgresql.Driver", "jdbc:postgresql://" + vmId + ":5432/" + dbName, dbName, "postgres", "ufc123", vmId);
+                        // databaseProxy = new QoSDBCDatabaseProxy("org.postgresql.Driver", "jdbc:postgresql://" + vmId + ":5432/" + dbName, dbName, "postgres", "ufc123", vmId);
                         break;
                     }
                 }
@@ -123,14 +140,14 @@ public class QoSDBCService extends Thread {
         OutputMessage.println("QoSDBC Service is running");
         while (serverSocket != null && !serverSocket.isClosed()) {
             try {
-              Socket dbConnection = serverSocket.accept();
-              dbConnection.setTcpNoDelay(true);
-              QoSDBCConnectionProxy connectionProxy =
-                        new QoSDBCConnectionProxy(  this, 
-                                                    dbConnection, 
-                                                    catalogConnection, 
-                                                    logConnection, 
-                                                    qosdbcLoadBalancer);
+                Socket dbConnection = serverSocket.accept();
+                dbConnection.setTcpNoDelay(true);
+                QoSDBCConnectionProxy connectionProxy =
+                        new QoSDBCConnectionProxy(this,
+                                dbConnection,
+                                catalogConnection,
+                                logConnection,
+                                qosdbcLoadBalancer);
                 connectionProxies.add(connectionProxy);
                 //OutputMessage.println("[Service]: " + "NEW QoSDBCConnectionProxy: " + dbConnection.toString());
                 connectionProxy.start();
@@ -155,8 +172,13 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.pause();
-                if (forecastingThreads.containsKey(dao.getVmId()+dao.getDbName()))
-                    forecastingThreads.get(dao.getVmId()+dao.getDbName()).pauseForecaster();
+                if (REACTIVE) {
+                    if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                        reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
+                } else {
+                    if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                        forecastingThreads.get(dao.getVmId() + dao.getDbName()).pauseForecaster();
+                }
                 numberOfConnections++;
             }
         }
@@ -180,8 +202,13 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.play();
-                if (forecastingThreads.containsKey(dao.getVmId()+dao.getDbName()))
-                    forecastingThreads.get(dao.getVmId()+dao.getDbName()).resumeForecaster();
+                if (REACTIVE) {
+                    if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                        reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();
+                } else {
+                    if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                        forecastingThreads.get(dao.getVmId() + dao.getDbName()).resumeForecaster();
+                }
                 numberOfConnections++;
             }
         }
@@ -198,7 +225,7 @@ public class QoSDBCService extends Thread {
             }
         }
     }
-    
+
     public void setInMigration(String dbName, boolean inMigration) {
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
@@ -218,5 +245,25 @@ public class QoSDBCService extends Thread {
         forecastingThreads.remove(vmId+dbName);
         }
         */
+    }
+
+    public int updateLog() {
+        int ret = 0;
+        ExecutorService es = Executors.newFixedThreadPool(connectionProxies.size());
+        for (int i = 0; i < connectionProxies.size(); i++) {
+            es.execute(connectionProxies.get(i).updateLog());
+        }
+        es.shutdown();
+        try {
+            es.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            ret = -1;
+            OutputMessage.println("[Service]: " + " ERROR: On update log threads wait!");
+        }
+        return ret;
+    }
+
+    public QoSDBCLoadBalancer getLoadBalancer() {
+        return this.qosdbcLoadBalancer;
     }
 }

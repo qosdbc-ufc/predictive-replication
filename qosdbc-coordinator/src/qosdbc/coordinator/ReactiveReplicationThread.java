@@ -60,29 +60,26 @@ public class ReactiveReplicationThread extends Thread {
         while (runThread) {
             try {
                 while(pauseThread) {
-                    Thread.sleep(timePeriodInSeconds * 1000);
+                    Thread.sleep(1000);
                 }
                 rtOutput = "";
                 // seconds to sleep
                 Thread.sleep(timePeriodInSeconds * 1000);
 
                 while(pauseThread) {
-                    Thread.sleep(timePeriodInSeconds * 1000);
+                    Thread.sleep(1000);
                 }
 
-                double[] series = getSeries();
-                if (series == null) {
+                double series = getSeries();
+                /*if (series == null) {
                     OutputMessage.println("ERROR - NO DATA FOR ReactiveReplicationThread");
                     break;
-                }
-                if (series.length > 0) {
-                    rtOutput += "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: ";
-                    for (int i = 0; i < series.length; i++) {
-                        rtOutput += String.valueOf(series[i] + " ");
-                    }
-                    logSla(series[0]);
+                }*/
+                if (series >= 0) {
+                    rtOutput = "\n[" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + "]: [ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
+                    logSla(series);
                     OutputMessage.println(rtOutput);
-                    if (series[0] > this.sla) {
+                    if (series > this.sla) {
                         violations++;
                     } else {
                         violations = 0;
@@ -90,7 +87,11 @@ public class ReactiveReplicationThread extends Thread {
 
                     if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
                         violations = 0;
-                        createReplica();
+                        if (numberOfReplicas == 0) {
+                            numberOfReplicas++;
+                            createReplica();
+                        }
+
                     }
                 }
             } catch (InterruptedException ex) {
@@ -118,7 +119,7 @@ public class ReactiveReplicationThread extends Thread {
      *
      * @return time series
      */
-    private double[] getSeries() {
+    private double getSeries() {
         int ret = this.qosdbcService.updateLog();
         if (ret == -1) {
             OutputMessage.println("ERROR -  qosdbcService could not update log!");
@@ -126,10 +127,10 @@ public class ReactiveReplicationThread extends Thread {
         long currentTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         ArrayList<Double> responseTimes = new ArrayList<Double>();
          String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
-                 "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
+                 "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "' ORDER BY time_local ASC;";
         //String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
         //        "' AND db_name = '" + dbname + "';";
-        OutputMessage.println(sql);
+        //OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();
             ResultSet resultSet = statement.executeQuery(sql);
@@ -144,31 +145,13 @@ public class ReactiveReplicationThread extends Thread {
         return filterData(responseTimes);
     }
 
-    private double[] filterData(ArrayList<Double> input) {
-        int dataSize = input.size();
-        double numberOfDataPoints = timePeriodInSeconds / timeInterval;
-        int chunkSize = (int)dataSize/(int)numberOfDataPoints;
-        chunkSize++;
-
-        int size = dataSize/chunkSize;
-        List<Double> dataPoints = new ArrayList<Double>();
-        int j=0;
-        int outCut = 0;
-        for (int i=0;i<input.size();i = i + chunkSize) {
-            if (chunkSize + i >= input.size()) {
-                outCut = input.size();
-            } else {
-                outCut = chunkSize + i;
-            }
-            //System.out.println("\nRange: i=" + i + " to=" + (outCut-1));
-            dataPoints.add(mean(input.subList(i, outCut)));
-            j++;
+    private double filterData(ArrayList<Double> input) {
+        double rt = 0.0;
+        for (int i=0;i<input.size();i++) {
+            rt += input.get(i);
         }
-        double[] series = new double[dataPoints.size()];
-        for (int i = 0; i < series.length; i++) {
-            series[i] = dataPoints.get(i);
-        }
-        return series;
+        rt /= input.size();
+        return rt;
     }
 
     private static double mean(List<Double> data) {

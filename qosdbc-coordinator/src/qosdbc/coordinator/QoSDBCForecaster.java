@@ -66,13 +66,14 @@ public class QoSDBCForecaster extends Thread {
         while (runThread) {
             try {
                 while(pauseThread) {
-                    Thread.sleep(timePeriodInSeconds * 1000);
+                    Thread.sleep(1000);
                 }
                 String arimaOutput = "";
                 // seconds to sleep
                 Thread.sleep(timePeriodInSeconds * 1000);
+
                 while(pauseThread) {
-                    Thread.sleep(timePeriodInSeconds * 1000);
+                    Thread.sleep(1000);
                 }
                 
                 double[] series = getSeries();
@@ -125,10 +126,10 @@ public class QoSDBCForecaster extends Thread {
         }
         ArrayList<Double> responseTimes = new ArrayList<Double>();
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
-                "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
+                "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "' ORDER BY time_local ASC;";
         //String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
         //        "' AND db_name = '" + dbname + "';";
-        OutputMessage.println(sql);
+        // OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();
             ResultSet resultSet = statement.executeQuery(sql);
@@ -176,7 +177,7 @@ public class QoSDBCForecaster extends Thread {
        // String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
        //         "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
-        "' AND db_name = '" + dbname + "';";
+        "' AND db_name = '" + dbname + "' ORDER BY time_local ASC;";
         OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();

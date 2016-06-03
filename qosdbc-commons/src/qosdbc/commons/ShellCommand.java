@@ -305,9 +305,6 @@ public final class ShellCommand {
                         if (result.size() > 0) {
                             result.remove(result.size() - 1);
                         }
-                        while ((s = stdError.readLine()) != null) {
-                            result.clear();
-                        }
                     } catch (IOException e) {
                         result.clear();
                     }
@@ -336,7 +333,8 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -354,7 +352,8 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -384,7 +383,8 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -402,7 +402,8 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -434,7 +435,8 @@ public final class ShellCommand {
                             result += s;
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -453,7 +455,8 @@ public final class ShellCommand {
                             result += s;
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -485,7 +488,8 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -495,6 +499,7 @@ public final class ShellCommand {
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
                         String s = null;
+                        String [] command = new String[]{"mysqldump", "-u", username, "-p" + password, database.getName(), "--result-file=" + fileName};
                         ProcessBuilder pb = new ProcessBuilder(new String[]{"mysqldump", "-u", username, "-p" + password, database.getName(), "--result-file=" + fileName});
                         Process p = pb.start();
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -503,16 +508,24 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
+                        int processCompleted = p.waitFor();
+                        OutputMessage.println("Process result: "+ processCompleted);
                     } catch (IOException e) {
+                        OutputMessage.println("ERROR: dumpCompleteDatabase - " + e.getMessage());
                         success = false;
+                    } catch (InterruptedException e) {
+                        OutputMessage.println("ERROR: dumpCompleteDatabase - " + e.getMessage());
+                        e.printStackTrace();
                     }
                     break;
                 }
             }
         }
         if (success) {
+            OutputMessage.println("Process result: OK");
             result = new File(fileName);
         }
         return result;
@@ -536,7 +549,8 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
                         }
                     } catch (IOException e) {
                         success = false;
@@ -554,10 +568,12 @@ public final class ShellCommand {
                         while ((s = stdInput.readLine()) != null) {
                         }
                         while ((s = stdError.readLine()) != null) {
-                            success = false;
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
+
                         }
                     } catch (IOException e) {
-                        System.out.println(e);
+                        OutputMessage.println(e.getMessage());
                         success = false;
                     }
                     break;
@@ -569,6 +585,7 @@ public final class ShellCommand {
 
     public static File downloadFile(String strUrl, String fileName) {
         File resultFile = null;
+        OutputMessage.println("Download dump: " + strUrl + " - " + fileName);
         try {
             URL url = new URL(strUrl);
             InputStream inputStream = url.openStream();
@@ -582,6 +599,8 @@ public final class ShellCommand {
             inputStream.close();
             resultFile = new File(fileName);
         } catch (IOException ex) {
+            OutputMessage.println(ex.getMessage());
+            ex.printStackTrace();
         }
         return resultFile;
     }

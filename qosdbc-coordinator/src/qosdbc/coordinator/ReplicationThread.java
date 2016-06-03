@@ -159,6 +159,7 @@ public class ReplicationThread extends Thread {
             switch (resultDump.getState()) {
                 case CommandCode.STATE_SUCCESS: {
                     dumpFileURL = (String) resultDump.getResultObject();
+                    OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: DATABASE_DUMP: " + dumpFileURL);
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: DATABASE_DUMP Success");
                     break;
                 }
@@ -182,8 +183,13 @@ public class ReplicationThread extends Thread {
             /* Restore database in destination agent - Begin */
             Command commandRestore = new Command();
             commandRestore.setCode(CommandCode.DATABASE_RESTORE);
-            hashMap.put("dumpFileURL", dumpFileURL);
-            commandRestore.setParameters(hashMap);
+            HashMap<String, Object> hashMapRe = new HashMap<String, Object>();
+            hashMapRe.put("databaseName", databaseName);
+            hashMapRe.put("username", "root");
+            hashMapRe.put("password", "ufc123");
+            hashMapRe.put("databaseType", databaseSystem);
+            hashMapRe.put("dumpFileUrl", dumpFileURL);
+            commandRestore.setParameters(hashMapRe);
 
             timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             outputStreamDestinationAgent.writeObject(commandRestore);
@@ -285,14 +291,14 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: " + sqlDbActiveReplica);
                 Statement statement = catalogConnection.createStatement();
                 int dbActiveReplica = statement.executeUpdate(sqlDbActiveReplica);
-                this.loadBalancer.addReplica(databaseName,
-                        new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + destinationHost + ":3306/" +
-                                databaseName,
-                                databaseName,
-                                "root",
-                                "ufc123",
-                                destinationHost,
-                                loadBalancer.isAutoCommit(databaseName)));
+                QoSDBCDatabaseProxy newConn = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + destinationHost + ":3306/" +
+                        databaseName,
+                        databaseName,
+                        "root",
+                        "ufc123",
+                        destinationHost,
+                        loadBalancer.isAutoCommit(databaseName));
+                this.loadBalancer.addReplica(databaseName, newConn);
                 // int dbState = statement.executeUpdate(sqlDbState);
                 statement.close();
                 if (dbActiveReplica > 0) {

@@ -78,10 +78,8 @@ public class QoSDBCService extends Thread {
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
-                        if (!dbName.equals("information_schema") &&
-                                !dbName.equals("mysql") &&
-                                !dbName.equals("performance_schema")) {
-                            if (!REACTIVE) {
+                        if (IsValidDb(dbName)) {
+                            if (REACTIVE) {
                                 ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(logConnection,
                                         catalogConnection,
                                         this,
@@ -133,6 +131,13 @@ public class QoSDBCService extends Thread {
             System.exit(0);
         }
         OutputMessage.println("The tests and creation of the databases connection were performed successfully");
+    }
+
+    private boolean IsValidDb(String dbName) {
+        return dbName.equals("twitter");
+        /*return  (!dbName.equals("information_schema") &&
+                !dbName.equals("mysql") &&
+                !dbName.equals("performance_schema"));*/
     }
 
     @Override
@@ -239,6 +244,7 @@ public class QoSDBCService extends Thread {
         String vmId = proxy.getCurrentDAO().getVmId();
         String dbName = proxy.getCurrentDAO().getDbName();
         connectionProxies.remove(proxy);
+        if (connectionProxies.size() == 0) this.qosdbcLoadBalancer.removeAllReplicas();
        /* if (forecastingThreads.containsKey(vmId+dbName)) {
         QoSDBCForecaster forecasterThread = forecastingThreads.get(vmId+dbName);
         if (forecasterThread != null) forecasterThread.stopForecaster();

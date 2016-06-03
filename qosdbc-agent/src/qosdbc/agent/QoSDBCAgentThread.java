@@ -11,6 +11,8 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.sql.Connection;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.commons.io.FileUtils;
 import qosdbc.commons.Database;
 import qosdbc.commons.DatabaseSystem;
@@ -83,8 +85,11 @@ public class QoSDBCAgentThread extends Thread {
                         int databaseType = Integer.parseInt(String.valueOf(command.getParameterValue("databaseType")));
                         Database database = new Database(databaseName, databaseType);
                         /* Database restore process */
-                        String dumpFileURL = (String) command.getParameterValue("dumpFileURL");
+                        OutputMessage.println("DATABASE_RESTORE: dbTpe= " + databaseType + " - " + databaseName + " - " + username  + " - " + password);
+                        String dumpFileURL = (String) command.getParameterValue("dumpFileUrl");
+                        OutputMessage.println("DumpFile URL: " + dumpFileURL);
                         File dumpFile = ShellCommand.downloadFile(dumpFileURL, dumpFileURL.substring(dumpFileURL.lastIndexOf("/") + 1));
+                        OutputMessage.println("dumpFile object = " + dumpFile.getAbsolutePath());
                         boolean dumpSuccess = ShellCommand.restoreCompleteDatabase(database, username, password, dumpFile);
                         if (dumpSuccess) {
                             result.setState(CommandCode.STATE_SUCCESS);
@@ -101,15 +106,32 @@ public class QoSDBCAgentThread extends Thread {
                         int databaseType = Integer.parseInt(String.valueOf(command.getParameterValue("databaseType")));
                         Database database = new Database(databaseName, databaseType);
                         /* Database dump process */
-                        File dumpFile = ShellCommand.dumpCompleteDatabase(database, username, password);
+                        OutputMessage.println("Dump info: dbTpe= " + databaseType + " - " + databaseName + " - " + username  + " - " + password);
+                        File dumpFile = null;
+                        File dest = null;
+                        try {
+                            dumpFile = ShellCommand.dumpCompleteDatabase(database, username, password);
+                            dest = new File("/var/www/html/qosdbc");
+                            OutputMessage.println("Copying dump... " + dumpFile.getAbsolutePath() );
+                            OutputMessage.println("to " + dest.getAbsolutePath());
+                        }catch (Exception e) {
+                            OutputMessage.println("ERROR: DD - " + e.getMessage());
+                            e.printStackTrace();
+                        }
                         if (dumpFile != null) {
-                            FileUtils.copyFileToDirectory(dumpFile, new File("/var/www/html/qosdbc/"));
+                            try {
+                                FileUtils.copyFileToDirectory(dumpFile, dest);
+                            }catch (Exception e) {
+                                OutputMessage.println("ERROR: DD - " + e.getMessage());
+                                e.printStackTrace();
+                            }
+                            OutputMessage.println("Dump copied Success: " + "http://" + vmId + "/qosdbc/" + dumpFile.getName());
                             result.setResultObject("http://" + vmId + "/qosdbc/" + dumpFile.getName());
                             result.setState(CommandCode.STATE_SUCCESS);
                         }
                         outputStream.writeObject(result);
                         outputStream.reset();
-                        dumpFile.delete();
+                        //dumpFile.delete();
                         break;
                     }
                     case CommandCode.DATABASE_DROP: {
@@ -130,8 +152,10 @@ public class QoSDBCAgentThread extends Thread {
                     }
                 }
             } catch (ClassNotFoundException ex) {
+                ex.printStackTrace();
                 break;
             } catch (IOException ex) {
+                ex.printStackTrace();
                 break;
             }
         }
@@ -139,6 +163,7 @@ public class QoSDBCAgentThread extends Thread {
             try {
                 socket.close();
             } catch (IOException ex) {
+                ex.printStackTrace();
             }
         }
         OutputMessage.println("QoSDBCAgentThread ended");

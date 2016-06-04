@@ -69,7 +69,8 @@ public class QoSDBCLoadBalancer {
     while (it.hasNext()) {
       Map.Entry pair = (Map.Entry)it.next();
       List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>)pair.getValue();
-      connectionList.add(conn);
+      if (connectionList.get(0).getDbName().equals(dbName))
+        connectionList.add(conn);
     }
     if (!replicasMap.containsKey(dbName)) {
       List<QoSDBCDatabaseProxy> connectionList = new ArrayList<QoSDBCDatabaseProxy>();

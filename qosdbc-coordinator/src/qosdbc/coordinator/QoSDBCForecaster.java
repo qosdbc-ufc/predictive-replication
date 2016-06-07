@@ -125,6 +125,7 @@ public class QoSDBCForecaster extends Thread {
             OutputMessage.println("ERROR -  qosdbcService could not update log!");
         }
         ArrayList<Double> responseTimes = new ArrayList<Double>();
+        ArrayList<Long> times = new ArrayList<Long>();
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
                 "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "' ORDER BY time_local ASC;";
         //String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
@@ -136,18 +137,20 @@ public class QoSDBCForecaster extends Thread {
             startTime = currentTime;
             while (resultSet.next()) {
                 double rt = resultSet.getDouble("response_time");
+                long time = resultSet.getLong("\"time\"");
                 responseTimes.add(rt);
+                times.add(time);
             }
         } catch (SQLException ex) {
             OutputMessage.println("ERROR -  Could not query response times from Log");
         }
-        logSla(filterData(responseTimes));
+        filterDataAndRecord(responseTimes, times);
     }
 
-    private void logSla(double[] rts) {
-        String sql = "INSERT INTO sla_log (db_name, response_time) VALUES ";
+    private void logSla(double[] rts, long[] times) {
+        String sql = "INSERT INTO sla_log (db_name, response_time, \"time\") VALUES ";
         for (int i=0; i<rts.length; i++) {
-            sql += "('" + dbname + "', " + rts[i] + ")";
+            sql += "('" + dbname + "', " + rts[i] + ", " +  times[i] + ")";
             if (i != rts.length - 1) sql += ", ";
         }
         try {
@@ -191,6 +194,41 @@ public class QoSDBCForecaster extends Thread {
             OutputMessage.println("ERROR -  Could not query response times from Log");
         }
         return filterData(responseTimes);
+    }
+
+    private void filterDataAndRecord(ArrayList<Double> input, ArrayList<Long> times) {
+        int dataSize = input.size();
+        double numberOfDataPoints = timePeriodInSeconds / timeInterval;
+        int chunkSize = (int)dataSize/(int)numberOfDataPoints;
+        chunkSize++;
+
+        int size = dataSize/chunkSize;
+        List<Double> dataPoints = new ArrayList<Double>();
+        List<Integer> timeIndexes = new ArrayList<Integer>();
+        int j=0;
+        int outCut = 0;
+        for (int i=0;i<input.size();i = i + chunkSize) {
+            if (chunkSize + i >= input.size()) {
+                outCut = input.size();
+            } else {
+                outCut = chunkSize + i;
+            }
+            //System.out.println("\nRange: i=" + i + " to=" + (outCut-1));
+            dataPoints.add(mean(input.subList(i, outCut)));
+            timeIndexes.add(i);
+            j++;
+        }
+
+        long[] timestamps = new long[timeIndexes.size()];
+        for (int i = 0; i < timeIndexes.size(); i++) {
+            timestamps [i] = times.get(timeIndexes.get(i));
+        }
+
+        double[] series = new double[dataPoints.size()];
+        for (int i = 0; i < series.length; i++) {
+            series[i] = dataPoints.get(i);
+        }
+        logSla(series, timestamps);
     }
 
    private double[] filterData(ArrayList<Double> input) {

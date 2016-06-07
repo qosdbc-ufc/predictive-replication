@@ -87,7 +87,7 @@ public class QoSDBCService extends Thread {
                                         vmId,
                                         dbName,
                                         Double.parseDouble(prop.getProperty(dbName + "_sla")));
-                                reactiveReplicThread.start();
+                                //reactiveReplicThread.start();
                                 reactiveReplicThreads.put(vmId + dbName, reactiveReplicThread);
                             } else {
                                 QoSDBCForecaster qosdbcForecaster = new QoSDBCForecaster(logConnection,
@@ -97,7 +97,7 @@ public class QoSDBCService extends Thread {
                                         vmId,
                                         dbName,
                                         Double.parseDouble(prop.getProperty(dbName + "_sla")));
-                                qosdbcForecaster.start();
+                                //qosdbcForecaster.start();
                                 forecastingThreads.put(vmId + dbName, qosdbcForecaster);
                             }
                         }
@@ -134,10 +134,10 @@ public class QoSDBCService extends Thread {
     }
 
     private boolean IsValidDb(String dbName) {
-        return dbName.equals("twitter");
-        /*return  (!dbName.equals("information_schema") &&
+        //return dbName.equals("twitter");
+        return  (!dbName.equals("information_schema") &&
                 !dbName.equals("mysql") &&
-                !dbName.equals("performance_schema"));*/
+                !dbName.equals("performance_schema"));
     }
 
     @Override
@@ -271,5 +271,15 @@ public class QoSDBCService extends Thread {
 
     public QoSDBCLoadBalancer getLoadBalancer() {
         return this.qosdbcLoadBalancer;
+    }
+
+    public synchronized void startMonitoring(String vmId, String dbName) {
+        if (REACTIVE) {
+            ReactiveReplicationThread thread = reactiveReplicThreads.get(vmId + dbName);
+            if(!thread.isAlive()) thread.start();
+        } else {
+            QoSDBCForecaster thread = forecastingThreads.get(vmId + dbName);
+            if(!thread.isAlive()) thread.start();
+        }
     }
 }

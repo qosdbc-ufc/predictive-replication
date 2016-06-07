@@ -124,6 +124,8 @@ public class QoSDBCLoadBalancer {
 
   synchronized public void removeTenant(long proxyId) {
     if(tenantMap.containsKey(proxyId)) {
+      tenantMap.get(proxyId).get(0).close();
+      tenantMap.remove(proxyId);
       targetMap.remove(proxyId);
       OutputMessage.println("[LoadBalancer] Removed Tenant "
               + proxyId);

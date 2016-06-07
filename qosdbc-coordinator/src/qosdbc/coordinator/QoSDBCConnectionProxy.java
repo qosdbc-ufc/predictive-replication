@@ -15,6 +15,8 @@ import qosdbc.commons.jdbc.*;
 import qosdbc.commons.jdbc.QoSDBCMessage.Response;
 import qosdbc.commons.jdbc.QoSDBCMessage.Request;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  *
  * @author Leonardo Oliveira Moreira
@@ -38,6 +40,8 @@ public class QoSDBCConnectionProxy extends Thread {
   private boolean flagMigration = false;
   private List<String> tempLog;
   private boolean balance = false;
+  private boolean monitoringStarted = false;
+  private String vmId;
 
   /**
    *
@@ -52,7 +56,7 @@ public class QoSDBCConnectionProxy extends Thread {
                                Connection logConnection,
                                QoSDBCLoadBalancer qosdbcLoadBalancer) {
 
-    this.proxyId = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+    this.proxyId = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + ThreadLocalRandom.current().nextInt(1, 1000000 + 1);
     this.qosdbcService = qosdbcService;
     this.dbConnection = dbConnection;
     this.catalogConnection = catalogConnection;
@@ -76,7 +80,7 @@ public class QoSDBCConnectionProxy extends Thread {
       while (resultSet.next()) {
         int dbmsType = resultSet.getInt("dbms_type");
         String vmId = resultSet.getString("vm_id");
-
+        this.vmId = vmId;
         switch (dbmsType) {
           case DatabaseSystem.TYPE_MYSQL: {
             if (dao != null) {
@@ -224,9 +228,7 @@ public class QoSDBCConnectionProxy extends Thread {
         // reads the request from the stream
         Request msg = Request.parseDelimitedFrom(inputStream);
         Response.Builder response = Response.newBuilder();
-
         if(!IsValidTenant(msg.getDatabase())) continue;
-
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
@@ -259,6 +261,10 @@ public class QoSDBCConnectionProxy extends Thread {
             break;
           }
           case RequestCode.SQL_STATEMENT_CREATE: {
+            synchronized (this) {
+              if (!monitoringStarted) this.qosdbcService.startMonitoring(this.vmId, this.databaseName);
+              monitoringStarted=true;
+            }
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               if (dao.getConnection().getAutoCommit()) {

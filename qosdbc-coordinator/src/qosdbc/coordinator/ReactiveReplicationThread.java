@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +37,7 @@ public class ReactiveReplicationThread extends Thread {
     private double sla;
     private int MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW = 4;
     private int violations = 0;
+    private long currentTime;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -76,8 +78,8 @@ public class ReactiveReplicationThread extends Thread {
                     break;
                 }*/
                 if (series >= 0) {
-                    rtOutput = "\n[" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + "]: [ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
-                    logSla(series);
+                    rtOutput = " [ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
+                    logSla(series, TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
                     OutputMessage.println(rtOutput);
                     if (series > this.sla) {
                         violations++;
@@ -103,8 +105,8 @@ public class ReactiveReplicationThread extends Thread {
     }
 
 
-    private void logSla(double rt) {
-        String sql = "INSERT INTO sla_log VALUES ('"+ this.dbname +"', " + rt + ")";
+    private void logSla(double rt, long time) {
+        String sql = "INSERT INTO sla_log VALUES ('"+ this.dbname +"', " + rt + ", " + time + ")";
         try {
             Statement statement = logConnection.createStatement();
             statement.executeUpdate(sql);
@@ -120,17 +122,16 @@ public class ReactiveReplicationThread extends Thread {
      * @return time series
      */
     private double getSeries() {
+        currentTime = startTime + 30000;
         int ret = this.qosdbcService.updateLog();
         if (ret == -1) {
             OutputMessage.println("ERROR -  qosdbcService could not update log!");
         }
-        long currentTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         ArrayList<Double> responseTimes = new ArrayList<Double>();
-         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
-                 "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "' ORDER BY time_local ASC;";
+        String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
+                 "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local < '" + currentTime + "' ORDER BY time_local ASC;";
         //String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
         //        "' AND db_name = '" + dbname + "';";
-        //OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();
             ResultSet resultSet = statement.executeQuery(sql);
@@ -139,6 +140,7 @@ public class ReactiveReplicationThread extends Thread {
                 double rt = resultSet.getDouble("response_time");
                 responseTimes.add(rt);
             }
+            OutputMessage.println("[RECORDING] " + dbname + "# " + responseTimes.size());
         } catch (SQLException ex) {
             OutputMessage.println("ERROR -  Could not query response times from Log");
         }

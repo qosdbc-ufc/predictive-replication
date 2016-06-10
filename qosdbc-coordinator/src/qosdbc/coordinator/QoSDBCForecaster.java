@@ -40,6 +40,7 @@ public class QoSDBCForecaster extends Thread {
     private int numberOfReplicas = 0;
     private boolean pauseThread = false;
     private double sla;
+    private long currentTime;
 
     public QoSDBCForecaster(Connection logConnection, 
             Connection catalogConnection,
@@ -70,12 +71,16 @@ public class QoSDBCForecaster extends Thread {
                 }
                 String arimaOutput = "";
                 // seconds to sleep
-                Thread.sleep(timePeriodInSeconds * 1000);
+                long workTime = 0;
+                long timeToSleep = (timePeriodInSeconds * 1000) - workTime;
+                Thread.sleep(timeToSleep);
 
                 while(pauseThread) {
                     Thread.sleep(1000);
                 }
-                
+
+                Thread.sleep(10000);
+                long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 double[] series = getSeries();
                 if (series == null) {
                     OutputMessage.println("ERROR - NO DATA FOR FORECASTER");
@@ -113,6 +118,7 @@ public class QoSDBCForecaster extends Thread {
                         createReplica();
                     }
                 }
+                workTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - start;
             } catch (InterruptedException ex) {
                 OutputMessage.println("ERROR - Error in QoSDBCForecaster thread");
             }
@@ -120,10 +126,10 @@ public class QoSDBCForecaster extends Thread {
     }
 
     private void doSlaLog(long currentTime) {
-        int ret = this.qosdbcService.updateLog();
+        /*int ret = this.qosdbcService.updateLog();
         if (ret == -1) {
             OutputMessage.println("ERROR -  qosdbcService could not update log!");
-        }
+        }*/
         ArrayList<Double> responseTimes = new ArrayList<Double>();
         ArrayList<Long> times = new ArrayList<Long>();
         String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
@@ -170,17 +176,15 @@ public class QoSDBCForecaster extends Thread {
      * @return time series
      */
     private double[] getSeries() {
-        int ret = this.qosdbcService.updateLog();
-        if (ret == -1) {
-            OutputMessage.println("ERROR -  qosdbcService could not update log!");
-        }
-        long currentTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-        doSlaLog(currentTime);
+        currentTime = startTime + (timePeriodInSeconds * 1000);
+        //int ret = this.qosdbcService.updateLog();
+        //if (ret == -1) {
+        //    OutputMessage.println("ERROR -  qosdbcService could not update log!");
+        //}
         ArrayList<Double> responseTimes = new ArrayList<Double>();
        // String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
        //         "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local <= '" + currentTime + "';";
-        String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId + 
-        "' AND db_name = '" + dbname + "' ORDER BY time_local ASC;";
+        String sql = "SELECT response_time FROM sla_log WHERE db_name = '" + dbname + "' AND \"time\" <= '" + currentTime + "' ORDER BY \"time\" ASC;";
         OutputMessage.println(sql);
         try {
             Statement statement = logConnection.createStatement();
@@ -191,9 +195,14 @@ public class QoSDBCForecaster extends Thread {
                 responseTimes.add(rt);
             }
         } catch (SQLException ex) {
-            OutputMessage.println("ERROR -  Could not query response times from Log");
+            OutputMessage.println("ERROR -  Could not query response times from Log: " + ex.getMessage());
         }
-        return filterData(responseTimes);
+        // return filterData(responseTimes);
+        double[] series = new double[responseTimes.size()];
+        for (int i = 0; i < series.length; i++) {
+            series[i] = responseTimes.get(i);
+        }
+        return series;
     }
 
     private void filterDataAndRecord(ArrayList<Double> input, ArrayList<Long> times) {

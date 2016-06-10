@@ -143,6 +143,9 @@ public class ReplicationThread extends Thread {
             /* Pause all connection proxies of the database - End */
 
             /* Generate dump database file in source agent - Begin */
+            Thread t = this.qosdbcService.flushTempLogBlocking(databaseName);
+            t.start();
+            t.join();
             Command commandDump = new Command();
             commandDump.setCode(CommandCode.DATABASE_DUMP);
             commandDump.setParameters(hashMap);
@@ -332,6 +335,8 @@ public class ReplicationThread extends Thread {
         } catch (ClassNotFoundException ex) {
             OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: ERROR(2)\n");
             ex.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }

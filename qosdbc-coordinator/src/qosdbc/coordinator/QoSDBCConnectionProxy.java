@@ -16,6 +16,8 @@ import qosdbc.commons.jdbc.QoSDBCMessage.Response;
 import qosdbc.commons.jdbc.QoSDBCMessage.Request;
 
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
@@ -23,6 +25,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class QoSDBCConnectionProxy extends Thread {
 
+  private final static String DELIMITER = "\"|\"";
   private QoSDBCService qosdbcService = null;
   private QoSDBCLoadBalancer qosdbcLoadBalancer = null;
   private Socket dbConnection = null;
@@ -42,6 +45,8 @@ public class QoSDBCConnectionProxy extends Thread {
   private boolean balance = false;
   private boolean monitoringStarted = false;
   private String vmId;
+  private AtomicLong responseTimeSum;
+  private AtomicInteger responseTimeCount;
 
   /**
    *
@@ -64,7 +69,9 @@ public class QoSDBCConnectionProxy extends Thread {
     this.qosdbcLoadBalancer = qosdbcLoadBalancer;
     statementList = new Hashtable<Long, Statement>();
     resultSetList = new Hashtable<Long, ResultSet>();
-    tempLog = new ArrayList<String>();
+    tempLog = Collections.synchronizedList(new ArrayList<String>());
+    responseTimeSum = new AtomicLong(0);
+    responseTimeCount = new AtomicInteger(0);
   }
 
   /**
@@ -245,12 +252,7 @@ public class QoSDBCConnectionProxy extends Thread {
             break;
           }
           case RequestCode.SQL_CONNECTION_CLOSE: {
-            UpdateLogThread thread = updateLog();
-            try {
-              thread.join();
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            }
+            //qosdbcService.flushTempLogBlocking(this.dao.getDbName());
             dao.rollback();
             if (dao != null && dao.isActive()) {
               //dao.close();
@@ -261,10 +263,6 @@ public class QoSDBCConnectionProxy extends Thread {
             break;
           }
           case RequestCode.SQL_STATEMENT_CREATE: {
-            synchronized (this) {
-              if (!monitoringStarted) this.qosdbcService.startMonitoring(this.vmId, this.databaseName);
-              monitoringStarted=true;
-            }
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               if (dao.getConnection().getAutoCommit()) {
@@ -380,15 +378,15 @@ public class QoSDBCConnectionProxy extends Thread {
         }
 
         long finishTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-        response.setStartTime(TimeUnit.NANOSECONDS.toMillis(startTime));
-        response.setFinishTime(TimeUnit.NANOSECONDS.toMillis(finishTime));
+        response.setStartTime(startTime);
+        response.setFinishTime(finishTime);
 
         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE || msg.getCode() == RequestCode.SQL_RESULTSET_CREATE || msg.getCode() == RequestCode.SQL_COMMIT || msg.getCode() == RequestCode.SQL_ROLLBACK)) {
           if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
             try {
               Statement statement = logConnection.createStatement();
               int result = statement.executeUpdate("DELETE FROM sql_log WHERE transaction_id = " + msg.getTransactionId());
-              OutputMessage.println("[" + proxyId + "]: # OF ROWS DELETED: " + result);
+              if (result> 0) OutputMessage.println("[" + proxyId + "]: # OF ROWS DELETED: " + result);
               statement.close();
             } catch (SQLException ex) {
               OutputMessage.println("[" + proxyId + "]: ERROR while rollbacking on log!");
@@ -400,6 +398,13 @@ public class QoSDBCConnectionProxy extends Thread {
             } else if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
               command = "ROLLBACK";
             }
+            synchronized (this) {
+              if (!monitoringStarted) this.qosdbcService.startMonitoring(this.vmId, this.databaseName);
+              monitoringStarted=true;
+            }
+
+            this.responseTimeSum.addAndGet(finishTime - startTime);
+            this.responseTimeCount.incrementAndGet();
             log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime), msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(), response.getAffectedRows(), flagMigration);
           }
         }
@@ -487,11 +492,18 @@ public class QoSDBCConnectionProxy extends Thread {
 
     if (sql != null) {
       sql = sql.replaceAll("[\']", "''");
+      sql = sql.replaceAll("\"", "\\\\\""); // gambiarra para wikipedia em csv
     }
 
+
     String sqlLog = "(" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + " , '" + vmId + "', '" + dbName + "', " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + ", '" + sql + "', " + requestCode + ", " + responseTime + ", " + slaResponseTime + ", " + (responseTime > slaResponseTime) + ", " + connectionId + ", " + transactionId + ", " + affectedRows + ", " + inMigration + ")";
-    tempLog.add(sqlLog);
-    if(tempLog.size() % 500 == 0) updateLog();
+    String sqlLog2 = "\"" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER + vmId + DELIMITER + dbName + DELIMITER + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER
+            + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
+            DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
+    synchronized (tempLog) {
+      tempLog.add(sqlLog2);
+      //OutputMessage.println("Added(" + tempLog.size() +") " + sqlLog);
+    }
   }
 
   public QoSDBCDatabaseProxy getCurrentDAO() {
@@ -504,16 +516,50 @@ public class QoSDBCConnectionProxy extends Thread {
         && !dbName.equals("performance_schema");
   }
 
+  /*
   public UpdateLogThread updateLog() {
     //OutputMessage.println("Logging: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
     List<String> copy;
-    synchronized (tempLog) {
-      copy = new ArrayList<String>(tempLog.size()+1);
+
+    synchronized (this) {
+      copy = new ArrayList<String>(tempLog.size());
+      copy.addAll(tempLog);
+      tempLog.clear();
+    }
+
+    UpdateLogThread updateLogThread = new UpdateLogThread(copy, this.logConnection);
+    updateLogThread.start();
+    return updateLogThread;
+  }
+*/
+  public UpdateLogThread fastUpdateLog() {
+    //OutputMessage.println("Logging: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
+    List<String> copy;
+    synchronized (this) {
+      copy = new ArrayList<String>(tempLog.size() + 1);
       copy.addAll(tempLog);
       tempLog.clear();
     }
     UpdateLogThread updateLogThread = new UpdateLogThread(copy, this.logConnection);
-    updateLogThread.run();
+    updateLogThread.setPriority(MAX_PRIORITY);
     return updateLogThread;
   }
+
+  public synchronized double getResponseTime() {
+    double rt = responseTimeSum.get() / (double)responseTimeCount.get();
+    responseTimeCount.set(0);
+    responseTimeSum.set(0);
+    return rt;
+  }
+
+  public synchronized List<String> getTempLog() {
+    List<String> copy;
+    synchronized (tempLog) {
+      copy = new ArrayList<String>(tempLog.size());
+      copy.addAll(tempLog);
+      tempLog.clear();
+    }
+    return copy;
+  }
+
 }

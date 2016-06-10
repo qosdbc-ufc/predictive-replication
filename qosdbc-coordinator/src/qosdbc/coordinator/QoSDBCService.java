@@ -11,7 +11,6 @@ import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -22,8 +21,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
 
@@ -42,6 +40,7 @@ public class QoSDBCService extends Thread {
     private QoSDBCForecaster qosdbcForecaster = null;
     HashMap<String, QoSDBCForecaster> forecastingThreads = null;
     HashMap<String, ReactiveReplicationThread> reactiveReplicThreads = null;
+    HashMap<String, QoSDBCLogger> loggerThreads = null;
     private boolean REACTIVE = true;
 
     public QoSDBCService(int qosdbcPort, Connection catalogConnection, Connection logConnection) {
@@ -52,6 +51,7 @@ public class QoSDBCService extends Thread {
         qosdbcLoadBalancer = new QoSDBCLoadBalancer();
         forecastingThreads = new HashMap<String, QoSDBCForecaster>();
         reactiveReplicThreads = new  HashMap<String, ReactiveReplicationThread>();
+        loggerThreads = new HashMap<String, QoSDBCLogger>();
 
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -97,7 +97,9 @@ public class QoSDBCService extends Thread {
                                         vmId,
                                         dbName,
                                         Double.parseDouble(prop.getProperty(dbName + "_sla")));
+                                QoSDBCLogger logger = new QoSDBCLogger(logConnection, catalogConnection, this, vmId, dbName);
                                 //qosdbcForecaster.start();
+                                loggerThreads.put(vmId + dbName,logger);
                                 forecastingThreads.put(vmId + dbName, qosdbcForecaster);
                             }
                         }
@@ -181,6 +183,8 @@ public class QoSDBCService extends Thread {
                     if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
                 } else {
+                    if (loggerThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                        loggerThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).pauseForecaster();
                 }
@@ -211,6 +215,8 @@ public class QoSDBCService extends Thread {
                     if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();
                 } else {
+                    if (loggerThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                        loggerThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).resumeForecaster();
                 }
@@ -253,7 +259,8 @@ public class QoSDBCService extends Thread {
         */
     }
 
-    public int updateLog() {
+    /*
+    public synchronized int updateLog() {
         int ret = 0;
         ExecutorService es = Executors.newFixedThreadPool(connectionProxies.size());
         for (int i = 0; i < connectionProxies.size(); i++) {
@@ -268,7 +275,7 @@ public class QoSDBCService extends Thread {
         }
         return ret;
     }
-
+    */
     public QoSDBCLoadBalancer getLoadBalancer() {
         return this.qosdbcLoadBalancer;
     }
@@ -278,8 +285,49 @@ public class QoSDBCService extends Thread {
             ReactiveReplicationThread thread = reactiveReplicThreads.get(vmId + dbName);
             if(!thread.isAlive()) thread.start();
         } else {
+            QoSDBCLogger loggerThread = loggerThreads.get(vmId + dbName);
+            if(!loggerThread.isAlive()) loggerThread.start();
             QoSDBCForecaster thread = forecastingThreads.get(vmId + dbName);
             if(!thread.isAlive()) thread.start();
         }
+    }
+
+    public synchronized double getResponseTime(String dbName) {
+        double rtSum = 0.0;
+        int i = 0;
+        for (QoSDBCConnectionProxy proxy : connectionProxies) {
+            if (proxy.getDatabaseName().equals(dbName)) {
+                rtSum += proxy.getResponseTime();
+                //OutputMessage.println("rtSum: " + rtSum);
+                i++;
+            }
+        }
+        //OutputMessage.println("Total rtSum: " + (rtSum / (double)i));
+        return rtSum / (double)i;
+    }
+
+    public synchronized UpdateLogThread flushTempLogBlocking(String dbName) {
+        List<String> temp = new ArrayList<String>();
+        for (QoSDBCConnectionProxy proxy : connectionProxies) {
+            if (proxy.getDatabaseName().equals(dbName)) {
+                temp.addAll(proxy.getTempLog());
+                //OutputMessage.println("Size of temp log: " + temp.size());
+            }
+        }
+        UpdateLogThread updateLogThread = new UpdateLogThread(temp, this.logConnection);
+        updateLogThread.setPriority(MAX_PRIORITY);
+        return updateLogThread;
+    }
+
+    public synchronized void flushTempLog(String dbName) {
+        List<String> temp = new ArrayList<String>();
+        for (QoSDBCConnectionProxy proxy : connectionProxies) {
+            if (proxy.getDatabaseName().equals(dbName)) {
+                temp.addAll(proxy.getTempLog());
+            }
+        }
+        UpdateLogThread updateLogThread = new UpdateLogThread(temp, this.logConnection);
+        updateLogThread.setPriority(MAX_PRIORITY);
+        updateLogThread.start();
     }
 }

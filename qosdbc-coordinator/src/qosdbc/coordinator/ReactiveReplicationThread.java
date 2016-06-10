@@ -5,7 +5,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,7 +25,7 @@ public class ReactiveReplicationThread extends Thread {
     private long startTime;
     private int arimaHorizon = 15;
     private Connection logConnection = null;
-    private int timePeriodInSeconds = 30;
+    private int timePeriodInSeconds = 60000;
     private int timeInterval = 30;
     private String vmId;
     private String dbname;
@@ -35,9 +34,14 @@ public class ReactiveReplicationThread extends Thread {
     private int numberOfReplicas = 0;
     private boolean pauseThread = false;
     private double sla;
-    private int MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW = 4;
+    private int MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW = 1;
     private int violations = 0;
     private long currentTime;
+    private long windowTimestamp;
+    private int timeToSleep;
+    int workTime = 0;
+    long query_rts_start;
+    long timeOfRt;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -64,22 +68,28 @@ public class ReactiveReplicationThread extends Thread {
                 while(pauseThread) {
                     Thread.sleep(1000);
                 }
+
                 rtOutput = "";
                 // seconds to sleep
-                Thread.sleep(timePeriodInSeconds * 1000);
-
+                timeToSleep = timePeriodInSeconds - workTime;
+                if (timeToSleep > 0) {
+                    //OutputMessage.println("SlEEP " + dbname + ": " + timeToSleep);
+                    Thread.sleep(timeToSleep);
+                } else {
+                    OutputMessage.println("WARNING: " + dbname + " " + "WorkTime larger than sleep");
+                }
                 while(pauseThread) {
                     Thread.sleep(1000);
                 }
-
-                double series = getSeries();
+                query_rts_start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                double series = qosdbcService.getResponseTime(this.dbname);
+                timeOfRt = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 /*if (series == null) {
                     OutputMessage.println("ERROR - NO DATA FOR ReactiveReplicationThread");
                     break;
                 }*/
                 if (series >= 0) {
-                    rtOutput = " [ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
-                    logSla(series, TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
+                    rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
                     OutputMessage.println(rtOutput);
                     if (series > this.sla) {
                         violations++;
@@ -89,12 +99,18 @@ public class ReactiveReplicationThread extends Thread {
 
                     if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
                         violations = 0;
-                        if (numberOfReplicas < 2) {
-                            numberOfReplicas++;
+                        //if (numberOfReplicas < 2) {
+                        //    numberOfReplicas++;
                             createReplica();
-                        }
+                        //}
 
                     }
+                    Thread t = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                    t.start();
+                    t.join();
+                    logSla(series, timeOfRt);
+                    workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
+                    OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }
             } catch (InterruptedException ex) {
                 OutputMessage.println("ERROR - Error in ReactiveReplicationThread thread");
@@ -122,16 +138,18 @@ public class ReactiveReplicationThread extends Thread {
      * @return time series
      */
     private double getSeries() {
-        currentTime = startTime + 30000;
-        int ret = this.qosdbcService.updateLog();
+        currentTime = startTime + 60000;
+        /*int ret = this.qosdbcService.updateLog();
         if (ret == -1) {
             OutputMessage.println("ERROR -  qosdbcService could not update log!");
-        }
+        }*/
         ArrayList<Double> responseTimes = new ArrayList<Double>();
-        String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
-                 "' AND db_name = '" + dbname + "' AND time_local >= '" + startTime + "' AND time_local < '" + currentTime + "' ORDER BY time_local ASC;";
+        String sql = "SELECT response_time, time_local FROM sql_log WHERE db_name = '" + dbname
+                + "' AND time_local >= '" + startTime + "' AND time_local < '" + currentTime + "' ORDER BY time_local ASC;";
         //String sql = "SELECT response_time FROM sql_log WHERE vm_id = '" + vmId +
         //        "' AND db_name = '" + dbname + "';";
+        //OutputMessage.println(sql);
+
         try {
             Statement statement = logConnection.createStatement();
             ResultSet resultSet = statement.executeQuery(sql);
@@ -139,10 +157,12 @@ public class ReactiveReplicationThread extends Thread {
             while (resultSet.next()) {
                 double rt = resultSet.getDouble("response_time");
                 responseTimes.add(rt);
+                windowTimestamp = resultSet.getLong("time_local");
             }
             OutputMessage.println("[RECORDING] " + dbname + "# " + responseTimes.size());
+            statement.close();
         } catch (SQLException ex) {
-            OutputMessage.println("ERROR -  Could not query response times from Log");
+            OutputMessage.println("ERROR -  Could not query response times from Log: " + ex.getMessage());
         }
         return filterData(responseTimes);
     }

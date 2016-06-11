@@ -505,11 +505,11 @@ public class QoSDBCConnectionProxy extends Thread {
         currentFileWriter.append(sqlLog2);
         currentFileWriter.append("\n");
         currentFileWriter.flush();
-        OutputMessage.println("ERROR: Could not write to temp csv file");
       } catch (IOException e) {
+        OutputMessage.println("ERROR: Could not write to temp csv file");
         e.printStackTrace();
       }
-    }
+    } // END synchronized
   }
 
   public QoSDBCDatabaseProxy getCurrentDAO() {
@@ -540,7 +540,7 @@ public class QoSDBCConnectionProxy extends Thread {
       } catch (IOException e) {
         e.printStackTrace();
       }
-    }
+    } // END synchronized
     return ret;
   }
 

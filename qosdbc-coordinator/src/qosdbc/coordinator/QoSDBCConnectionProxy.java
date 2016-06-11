@@ -381,6 +381,11 @@ public class QoSDBCConnectionProxy extends Thread {
         response.setStartTime(startTime);
         response.setFinishTime(finishTime);
 
+        // sends response through the stream
+        response.build().writeDelimitedTo(outputStream);
+        outputStream.flush();
+
+
         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE || msg.getCode() == RequestCode.SQL_RESULTSET_CREATE || msg.getCode() == RequestCode.SQL_COMMIT || msg.getCode() == RequestCode.SQL_ROLLBACK)) {
           if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
             try {
@@ -409,9 +414,6 @@ public class QoSDBCConnectionProxy extends Thread {
           }
         }
 
-        // sends response through the stream
-        response.build().writeDelimitedTo(outputStream);
-        outputStream.flush();
 
         if (msg.getCode() == RequestCode.SQL_ROLLBACK ||
             msg.getCode() == RequestCode.SQL_COMMIT) {

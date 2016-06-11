@@ -23,10 +23,8 @@ public class ReactiveReplicationThread extends Thread {
 
     private boolean runThread = true;
     private long startTime;
-    private int arimaHorizon = 15;
     private Connection logConnection = null;
     private int timePeriodInSeconds = 60000;
-    private int timeInterval = 30;
     private String vmId;
     private String dbname;
     private Connection catalogConnection;
@@ -63,6 +61,7 @@ public class ReactiveReplicationThread extends Thread {
         OutputMessage.println("[ReactiveReplicationThread("+vmId+"/"+dbname+")] running...");
         startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         String rtOutput = "";
+        double series = 0;
         while (runThread) {
             try {
                 while(pauseThread) {
@@ -82,7 +81,7 @@ public class ReactiveReplicationThread extends Thread {
                     Thread.sleep(1000);
                 }
                 query_rts_start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-                double series = qosdbcService.getResponseTime(this.dbname);
+                series = qosdbcService.getResponseTime(this.dbname);
                 timeOfRt = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 /*if (series == null) {
                     OutputMessage.println("ERROR - NO DATA FOR ReactiveReplicationThread");
@@ -106,9 +105,7 @@ public class ReactiveReplicationThread extends Thread {
 
                     }
                     logSla(series, timeOfRt);
-                    Thread t = this.qosdbcService.flushTempLogBlocking(this.dbname);
-                    t.start();
-                    t.join();
+                    this.qosdbcService.flushTempLog(this.dbname);
                     workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }

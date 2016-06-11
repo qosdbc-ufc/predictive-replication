@@ -75,9 +75,7 @@ public class QoSDBCLogger extends Thread {
                     logSla(series, rtTime);
                     OutputMessage.println(rtOutput);
                 }
-                Thread t = this.qosdbcService.flushTempLogBlocking(this.dbname);
-                t.start();
-                t.join();
+                this.qosdbcService.flushTempLog(this.dbname);
                 workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                 OutputMessage.println("WORK " + this.dbname + ": " + workTime);
             } catch (InterruptedException ex) {

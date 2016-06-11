@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import qosdbc.commons.DatabaseSystem;
@@ -42,6 +43,7 @@ public class QoSDBCService extends Thread {
     HashMap<String, ReactiveReplicationThread> reactiveReplicThreads = null;
     HashMap<String, QoSDBCLogger> loggerThreads = null;
     private boolean REACTIVE = true;
+    ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
 
     public QoSDBCService(int qosdbcPort, Connection catalogConnection, Connection logConnection) {
         this.qosdbcPort = qosdbcPort;
@@ -250,7 +252,10 @@ public class QoSDBCService extends Thread {
         String vmId = proxy.getCurrentDAO().getVmId();
         String dbName = proxy.getCurrentDAO().getDbName();
         connectionProxies.remove(proxy);
-        if (connectionProxies.size() == 0) this.qosdbcLoadBalancer.removeAllReplicas();
+        if (connectionProxies.size() == 0) {
+            this.qosdbcLoadBalancer.removeAllReplicas();
+            finishExecutor();
+        }
        /* if (forecastingThreads.containsKey(vmId+dbName)) {
         QoSDBCForecaster forecasterThread = forecastingThreads.get(vmId+dbName);
         if (forecasterThread != null) forecasterThread.stopForecaster();
@@ -306,7 +311,7 @@ public class QoSDBCService extends Thread {
         return rtSum / (double)i;
     }
 
-    public synchronized UpdateLogThread flushTempLogBlocking(String dbName) {
+    public synchronized void flushTempLog(String dbName) {
         List<String> temp = new ArrayList<String>();
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             if (proxy.getDatabaseName().equals(dbName)) {
@@ -314,20 +319,30 @@ public class QoSDBCService extends Thread {
                 //OutputMessage.println("Size of temp log: " + temp.size());
             }
         }
-        UpdateLogThread updateLogThread = new UpdateLogThread(temp, this.logConnection);
-        updateLogThread.setPriority(MAX_PRIORITY);
-        return updateLogThread;
+        executor.execute(new UpdateLogThread(temp, this.logConnection, dbName));
+        //return updateLogThread;
     }
 
-    public synchronized void flushTempLog(String dbName) {
+    public synchronized Thread flushTempLogBlocking(String dbName) {
         List<String> temp = new ArrayList<String>();
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             if (proxy.getDatabaseName().equals(dbName)) {
                 temp.addAll(proxy.getTempLog());
+                //OutputMessage.println("Size of temp log: " + temp.size());
             }
         }
-        UpdateLogThread updateLogThread = new UpdateLogThread(temp, this.logConnection);
-        updateLogThread.setPriority(MAX_PRIORITY);
-        updateLogThread.start();
+        Thread thread = new Thread(new UpdateLogThread(temp, this.logConnection, dbName));
+        thread.setPriority(MAX_PRIORITY);
+        return thread;
     }
+
+    private void finishExecutor() {
+        executor.shutdown();
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            OutputMessage.println("[Service]: " + " ERROR: On update log threads wait!");
+        }
+    }
+
 }

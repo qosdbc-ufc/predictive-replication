@@ -42,7 +42,6 @@ public class QoSDBCConnectionProxy extends Thread {
   private boolean inMigration = false;
   private boolean flagMigration = false;
   private List<String> tempLog;
-  private boolean balance = false;
   private boolean monitoringStarted = false;
   private String vmId;
   private AtomicLong responseTimeSum;
@@ -496,7 +495,7 @@ public class QoSDBCConnectionProxy extends Thread {
     }
 
 
-    String sqlLog = "(" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + " , '" + vmId + "', '" + dbName + "', " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + ", '" + sql + "', " + requestCode + ", " + responseTime + ", " + slaResponseTime + ", " + (responseTime > slaResponseTime) + ", " + connectionId + ", " + transactionId + ", " + affectedRows + ", " + inMigration + ")";
+    //String sqlLog = "(" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + " , '" + vmId + "', '" + dbName + "', " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + ", '" + sql + "', " + requestCode + ", " + responseTime + ", " + slaResponseTime + ", " + (responseTime > slaResponseTime) + ", " + connectionId + ", " + transactionId + ", " + affectedRows + ", " + inMigration + ")";
     String sqlLog2 = "\"" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER + vmId + DELIMITER + dbName + DELIMITER + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER
             + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
             DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
@@ -516,34 +515,6 @@ public class QoSDBCConnectionProxy extends Thread {
         && !dbName.equals("performance_schema");
   }
 
-  /*
-  public UpdateLogThread updateLog() {
-    //OutputMessage.println("Logging: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
-    List<String> copy;
-
-    synchronized (this) {
-      copy = new ArrayList<String>(tempLog.size());
-      copy.addAll(tempLog);
-      tempLog.clear();
-    }
-
-    UpdateLogThread updateLogThread = new UpdateLogThread(copy, this.logConnection);
-    updateLogThread.start();
-    return updateLogThread;
-  }
-*/
-  public UpdateLogThread fastUpdateLog() {
-    //OutputMessage.println("Logging: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
-    List<String> copy;
-    synchronized (this) {
-      copy = new ArrayList<String>(tempLog.size() + 1);
-      copy.addAll(tempLog);
-      tempLog.clear();
-    }
-    UpdateLogThread updateLogThread = new UpdateLogThread(copy, this.logConnection);
-    updateLogThread.setPriority(MAX_PRIORITY);
-    return updateLogThread;
-  }
 
   public synchronized double getResponseTime() {
     double rt = responseTimeSum.get() / (double)responseTimeCount.get();

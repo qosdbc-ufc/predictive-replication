@@ -5,6 +5,7 @@ import org.postgresql.core.BaseConnection;
 import qosdbc.commons.OutputMessage;
 
 import java.io.*;
+import java.nio.channels.FileChannel;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -31,15 +32,23 @@ public class UpdateLogThread implements Runnable {
 
         OutputMessage.println("[UpdateLogThread] # Files: " + tempLog.size());
         long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+
         try {
-            CopyManager copyManager = new CopyManager((BaseConnection) logConnection);
+            String finalFile = "temp" + dbName + start + ".csv";
+            FileChannel c2 = new FileOutputStream(finalFile, true).getChannel();
             for (String tempFile : tempLog) {
-                File file = new File(tempFile);
-                FileReader fileReader = new FileReader(file);
-                copyManager.copyIn("COPY sql_log (\"time\", vm_id, db_name, time_local, sql, sql_type, response_time, sla_response_time, sla_violated, connection_id, transaction_id, affected_rows, in_migration)" +
-                    " FROM STDIN With csv delimiter '|' escape '\\'", fileReader);
-                file.delete();
+                FileChannel c1 = new FileInputStream(tempFile).getChannel();
+                c2.transferFrom(c1, c2.size(), c1.size());
+                deleteFile(tempFile);
             }
+            CopyManager copyManager = new CopyManager((BaseConnection) logConnection);
+
+            File file = new File(finalFile);
+            FileReader fileReader = new FileReader(file);
+            copyManager.copyIn("COPY sql_log (\"time\", vm_id, db_name, time_local, sql, sql_type, response_time, sla_response_time, sla_violated, connection_id, transaction_id, affected_rows, in_migration)" +
+                " FROM STDIN With csv delimiter '|' escape '\\'", fileReader);
+            file.delete();
+
             tempLog.clear();
             OutputMessage.println("[UpdateLogThread]: " + dbName + " Finished in " +
                 (TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - start));
@@ -48,5 +57,9 @@ public class UpdateLogThread implements Runnable {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+    private void deleteFile(String fileName) {
+        File temp = new File(fileName);
+        temp.delete();
     }
 }

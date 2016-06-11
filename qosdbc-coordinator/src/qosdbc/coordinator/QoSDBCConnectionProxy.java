@@ -545,7 +545,7 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   private FileWriter createNewFileWriter() {
-    String currentFileName = proxyId + fileCounter + ".csv";
+    String currentFileName = "/home/lsbd/coordinator/temp/" + proxyId + fileCounter + ".csv";
     fileCounter++;
     currentFile = new File(currentFileName);
     FileWriter writer = null;

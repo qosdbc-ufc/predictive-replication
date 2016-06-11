@@ -1,10 +1,6 @@
 package qosdbc.coordinator;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.Socket;
 import java.sql.*;
 import java.util.*;
@@ -46,6 +42,10 @@ public class QoSDBCConnectionProxy extends Thread {
   private String vmId;
   private AtomicLong responseTimeSum;
   private AtomicInteger responseTimeCount;
+  private int fileCounter = 0;
+  private FileWriter currentFileWriter = null;
+  private final Object lock = new Object();
+  private File currentFile = null;
 
   /**
    *
@@ -71,6 +71,7 @@ public class QoSDBCConnectionProxy extends Thread {
     tempLog = Collections.synchronizedList(new ArrayList<String>());
     responseTimeSum = new AtomicLong(0);
     responseTimeCount = new AtomicInteger(0);
+    currentFileWriter = createNewFileWriter();
   }
 
   /**
@@ -499,9 +500,15 @@ public class QoSDBCConnectionProxy extends Thread {
     String sqlLog2 = "\"" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER + vmId + DELIMITER + dbName + DELIMITER + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER
             + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
             DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
-    synchronized (tempLog) {
-      tempLog.add(sqlLog2);
-      //OutputMessage.println("Added(" + tempLog.size() +") " + sqlLog);
+    synchronized (lock) {
+      try {
+        currentFileWriter.append(sqlLog2);
+        currentFileWriter.append("\n");
+        currentFileWriter.flush();
+        OutputMessage.println("ERROR: Could not write to temp csv file");
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
   }
 
@@ -523,14 +530,34 @@ public class QoSDBCConnectionProxy extends Thread {
     return rt;
   }
 
-  public synchronized List<String> getTempLog() {
-    List<String> copy;
-    synchronized (tempLog) {
-      copy = new ArrayList<String>(tempLog.size());
-      copy.addAll(tempLog);
-      tempLog.clear();
+  public synchronized String getTempLog() {
+    String ret = "";
+    synchronized (lock) {
+      try {
+        ret = currentFile.getAbsolutePath();
+        currentFileWriter.close();
+        currentFileWriter = createNewFileWriter();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
-    return copy;
+    return ret;
   }
+
+  private FileWriter createNewFileWriter() {
+    String currentFileName = proxyId + fileCounter + ".csv";
+    fileCounter++;
+    currentFile = new File(currentFileName);
+    FileWriter writer = null;
+    try {
+      currentFile.createNewFile();
+      writer = new FileWriter(currentFile);
+    } catch (IOException e) {
+      OutputMessage.println("ERROR: Could not create temp csv file");
+      e.printStackTrace();
+    }
+    return writer;
+  }
+
 
 }

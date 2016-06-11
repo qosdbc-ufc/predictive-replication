@@ -29,7 +29,8 @@ public class UpdateLogThread implements Runnable {
     public void run() {
         if (tempLog.isEmpty()) return;
 
-        OutputMessage.println("[UpdateLogThread] Rows: " + tempLog.size());
+        OutputMessage.println("[UpdateLogThread] # Files: " + tempLog.size());
+        long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         try {
             CopyManager copyManager = new CopyManager((BaseConnection) logConnection);
             for (String tempFile : tempLog) {
@@ -40,7 +41,8 @@ public class UpdateLogThread implements Runnable {
                 file.delete();
             }
             tempLog.clear();
-            OutputMessage.println("[UpdateLogThread]: " + dbName + " Finished");
+            OutputMessage.println("[UpdateLogThread]: " + dbName + " Finished in " +
+                (TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - start));
         } catch (IOException e) {
             e.printStackTrace();
         } catch (SQLException e) {

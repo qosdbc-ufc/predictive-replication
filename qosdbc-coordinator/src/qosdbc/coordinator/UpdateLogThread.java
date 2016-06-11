@@ -34,7 +34,7 @@ public class UpdateLogThread implements Runnable {
         long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
         try {
-            String finalFile = "temp" + dbName + start + ".csv";
+            String finalFile = "/home/lsbd/coordinator/temp/" + "temp" + dbName + start + ".csv";
             FileChannel c2 = new FileOutputStream(finalFile, true).getChannel();
             for (String tempFile : tempLog) {
                 FileChannel c1 = new FileInputStream(tempFile).getChannel();

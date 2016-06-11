@@ -99,16 +99,16 @@ public class ReactiveReplicationThread extends Thread {
 
                     if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
                         violations = 0;
-                        //if (numberOfReplicas < 2) {
-                        //    numberOfReplicas++;
+                        if (numberOfReplicas < 1) {
+                            numberOfReplicas++;
                             createReplica();
-                        //}
+                        }
 
                     }
+                    logSla(series, timeOfRt);
                     Thread t = this.qosdbcService.flushTempLogBlocking(this.dbname);
                     t.start();
                     t.join();
-                    logSla(series, timeOfRt);
                     workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }

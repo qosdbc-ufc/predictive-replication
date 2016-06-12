@@ -31,7 +31,7 @@ public class UpdateLogThread implements Runnable {
 
         OutputMessage.println("[UpdateLogThread] Rows: " + tempLog.size());
         try {
-            String fname = "temp" + (TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
+            String fname = "/home/lsbd/coordinator/temp" + (TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
                     + ThreadLocalRandom.current().nextInt(1, 1000000 + 1)) + ".csv";
             FileWriter writer = new FileWriter(fname);
             for (int i=0; i<tempLog.size(); i++) {
@@ -47,8 +47,8 @@ public class UpdateLogThread implements Runnable {
                     " FROM STDIN With csv delimiter '|' escape '\\'", reader);
             OutputMessage.println("[UpdateLogThread]: " + dbName + " Finished");
             reader.close();
-            File file = new File(fname);
-            file.delete();
+            //File file = new File(fname);
+            //file.delete();
             //Statement statement = logConnection.createStatement();
             //statement.executeUpdate(sql);
             //statement.close();

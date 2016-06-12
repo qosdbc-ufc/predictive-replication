@@ -1,6 +1,10 @@
 package qosdbc.coordinator;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.sql.*;
 import java.util.*;
@@ -42,10 +46,6 @@ public class QoSDBCConnectionProxy extends Thread {
   private String vmId;
   private AtomicLong responseTimeSum;
   private AtomicInteger responseTimeCount;
-  private int fileCounter = 0;
-  private FileWriter currentFileWriter = null;
-  private final Object lock = new Object();
-  private File currentFile = null;
 
   /**
    *
@@ -71,7 +71,6 @@ public class QoSDBCConnectionProxy extends Thread {
     tempLog = Collections.synchronizedList(new ArrayList<String>());
     responseTimeSum = new AtomicLong(0);
     responseTimeCount = new AtomicInteger(0);
-    currentFileWriter = createNewFileWriter();
   }
 
   /**
@@ -381,11 +380,6 @@ public class QoSDBCConnectionProxy extends Thread {
         response.setStartTime(startTime);
         response.setFinishTime(finishTime);
 
-        // sends response through the stream
-        response.build().writeDelimitedTo(outputStream);
-        outputStream.flush();
-
-
         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE || msg.getCode() == RequestCode.SQL_RESULTSET_CREATE || msg.getCode() == RequestCode.SQL_COMMIT || msg.getCode() == RequestCode.SQL_ROLLBACK)) {
           if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
             try {
@@ -414,6 +408,9 @@ public class QoSDBCConnectionProxy extends Thread {
           }
         }
 
+        // sends response through the stream
+        response.build().writeDelimitedTo(outputStream);
+        outputStream.flush();
 
         if (msg.getCode() == RequestCode.SQL_ROLLBACK ||
             msg.getCode() == RequestCode.SQL_COMMIT) {
@@ -502,16 +499,10 @@ public class QoSDBCConnectionProxy extends Thread {
     String sqlLog2 = "\"" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER + vmId + DELIMITER + dbName + DELIMITER + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER
             + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
             DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
-    synchronized (lock) {
-      try {
-        currentFileWriter.append(sqlLog2);
-        currentFileWriter.append("\n");
-        currentFileWriter.flush();
-      } catch (IOException e) {
-        OutputMessage.println("ERROR: Could not write to temp csv file");
-        e.printStackTrace();
-      }
-    } // END synchronized
+    synchronized (tempLog) {
+      tempLog.add(sqlLog2);
+      //OutputMessage.println("Added(" + tempLog.size() +") " + sqlLog);
+    }
   }
 
   public QoSDBCDatabaseProxy getCurrentDAO() {
@@ -532,34 +523,14 @@ public class QoSDBCConnectionProxy extends Thread {
     return rt;
   }
 
-  public synchronized String getTempLog() {
-    String ret = "";
-    synchronized (lock) {
-      try {
-        ret = currentFile.getAbsolutePath();
-        currentFileWriter.close();
-        currentFileWriter = createNewFileWriter();
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    } // END synchronized
-    return ret;
-  }
-
-  private FileWriter createNewFileWriter() {
-    String currentFileName = "/home/lsbd/coordinator/temp/" + proxyId + fileCounter + ".csv";
-    fileCounter++;
-    currentFile = new File(currentFileName);
-    FileWriter writer = null;
-    try {
-      currentFile.createNewFile();
-      writer = new FileWriter(currentFile);
-    } catch (IOException e) {
-      OutputMessage.println("ERROR: Could not create temp csv file");
-      e.printStackTrace();
+  public synchronized List<String> getTempLog() {
+    List<String> copy;
+    synchronized (tempLog) {
+      copy = new ArrayList<String>(tempLog.size());
+      copy.addAll(tempLog);
+      tempLog.clear();
     }
-    return writer;
+    return copy;
   }
-
 
 }

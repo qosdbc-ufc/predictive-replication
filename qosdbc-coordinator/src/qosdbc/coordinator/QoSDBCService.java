@@ -264,6 +264,23 @@ public class QoSDBCService extends Thread {
         */
     }
 
+    /*
+    public synchronized int updateLog() {
+        int ret = 0;
+        ExecutorService es = Executors.newFixedThreadPool(connectionProxies.size());
+        for (int i = 0; i < connectionProxies.size(); i++) {
+            es.execute(connectionProxies.get(i).updateLog());
+        }
+        es.shutdown();
+        try {
+            es.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            ret = -1;
+            OutputMessage.println("[Service]: " + " ERROR: On update log threads wait!");
+        }
+        return ret;
+    }
+    */
     public QoSDBCLoadBalancer getLoadBalancer() {
         return this.qosdbcLoadBalancer;
     }
@@ -298,7 +315,7 @@ public class QoSDBCService extends Thread {
         List<String> temp = new ArrayList<String>();
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             if (proxy.getDatabaseName().equals(dbName)) {
-                temp.add(proxy.getTempLog());
+                temp.addAll(proxy.getTempLog());
                 //OutputMessage.println("Size of temp log: " + temp.size());
             }
         }
@@ -310,7 +327,7 @@ public class QoSDBCService extends Thread {
         List<String> temp = new ArrayList<String>();
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             if (proxy.getDatabaseName().equals(dbName)) {
-                temp.add(proxy.getTempLog());
+                temp.addAll(proxy.getTempLog());
                 //OutputMessage.println("Size of temp log: " + temp.size());
             }
         }

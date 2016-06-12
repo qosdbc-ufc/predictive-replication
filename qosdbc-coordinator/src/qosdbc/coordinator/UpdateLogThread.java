@@ -31,14 +31,14 @@ public class UpdateLogThread implements Runnable {
 
         OutputMessage.println("[UpdateLogThread] Rows: " + tempLog.size());
         try {
-            String fname = "/home/lsbd/coordinator/temp" + (TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
+            String fname = "/home/lsbd/coordinator/temp/temp" + (TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
                     + ThreadLocalRandom.current().nextInt(1, 1000000 + 1)) + ".csv";
             FileWriter writer = new FileWriter(fname);
             for (int i=0; i<tempLog.size(); i++) {
                 writer.append(tempLog.get(i));
                 writer.append("\n");
             }
-            tempLog.clear();
+            tempLog = null;
             writer.flush();
             writer.close();
             CopyManager copyManager = new CopyManager((BaseConnection) logConnection);

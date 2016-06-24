@@ -10,10 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,7 +79,7 @@ public class QoSDBCService extends Thread {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
                         if (IsValidDb(dbName)) {
                             if (REACTIVE) {
-                                ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(logConnection,
+                                ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(createConnectionToLog(),
                                         catalogConnection,
                                         this,
                                         Integer.parseInt(prop.getProperty(dbName + "_pinterval")),
@@ -92,7 +89,7 @@ public class QoSDBCService extends Thread {
                                 //reactiveReplicThread.start();
                                 reactiveReplicThreads.put(vmId + dbName, reactiveReplicThread);
                             } else {
-                                QoSDBCForecaster qosdbcForecaster = new QoSDBCForecaster(logConnection,
+                                QoSDBCForecaster qosdbcForecaster = new QoSDBCForecaster(createConnectionToLog(),
                                         catalogConnection,
                                         this,
                                         Integer.parseInt(prop.getProperty(dbName + "_pinterval")),
@@ -252,16 +249,25 @@ public class QoSDBCService extends Thread {
         String vmId = proxy.getCurrentDAO().getVmId();
         String dbName = proxy.getCurrentDAO().getDbName();
         connectionProxies.remove(proxy);
+        OutputMessage.println("[SERVICE]: connectionProxies.size() = " + connectionProxies.size());
         if (connectionProxies.size() == 0) {
+            OutputMessage.println("[SERVICE]: All proxies FINISHED");
             this.qosdbcLoadBalancer.removeAllReplicas();
-            finishExecutor();
+            //finishExecutor();
+            if (REACTIVE) {
+                if (reactiveReplicThreads.containsKey(vmId+dbName)) {
+                    Thread forecasterThread = reactiveReplicThreads.get(vmId+dbName);
+                    if (forecasterThread != null) forecasterThread.stop();
+                    reactiveReplicThreads.remove(vmId+dbName);
+                }
+            } else {
+                if (forecastingThreads.containsKey(vmId + dbName)) {
+                    QoSDBCForecaster forecasterThread = forecastingThreads.get(vmId + dbName);
+                    if (forecasterThread != null) forecasterThread.stop();
+                    forecastingThreads.remove(vmId + dbName);
+                }
+            }
         }
-       /* if (forecastingThreads.containsKey(vmId+dbName)) {
-        QoSDBCForecaster forecasterThread = forecastingThreads.get(vmId+dbName);
-        if (forecasterThread != null) forecasterThread.stopForecaster();
-        forecastingThreads.remove(vmId+dbName);
-        }
-        */
     }
 
     /*
@@ -288,26 +294,33 @@ public class QoSDBCService extends Thread {
     public synchronized void startMonitoring(String vmId, String dbName) {
         if (REACTIVE) {
             ReactiveReplicationThread thread = reactiveReplicThreads.get(vmId + dbName);
-            if(!thread.isAlive()) thread.start();
+            if (thread!=null)
+                if(!thread.isAlive()) thread.start();
         } else {
             QoSDBCLogger loggerThread = loggerThreads.get(vmId + dbName);
-            if(!loggerThread.isAlive()) loggerThread.start();
+            if(loggerThread!=null)
+                if(!loggerThread.isAlive()) loggerThread.start();
             QoSDBCForecaster thread = forecastingThreads.get(vmId + dbName);
-            if(!thread.isAlive()) thread.start();
+            if (thread!=null)
+                if(!thread.isAlive()) thread.start();
         }
     }
 
     public synchronized double getResponseTime(String dbName) {
         double rtSum = 0.0;
         int i = 0;
+        double aux;
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
+            if (proxy == null) continue;
             if (proxy.getDatabaseName().equals(dbName)) {
-                rtSum += proxy.getResponseTime();
-                //OutputMessage.println("rtSum: " + rtSum);
-                i++;
+                aux = proxy.getResponseTime();
+                if (aux > 0.00000) {
+                    rtSum += aux;
+                    i++;
+                }
             }
         }
-        //OutputMessage.println("Total rtSum: " + (rtSum / (double)i));
+        OutputMessage.println(dbName + " rtSum: " + rtSum + " count: " + (double)i);
         return rtSum / (double)i;
     }
 
@@ -343,6 +356,23 @@ public class QoSDBCService extends Thread {
         } catch (InterruptedException e) {
             OutputMessage.println("[Service]: " + " ERROR: On update log threads wait!");
         }
+    }
+
+    private Connection createConnectionToLog() {
+        // Creates the connection with the Log's Service
+        Connection logConnection = null;
+        try {
+            Class.forName("org.postgresql.Driver");
+            logConnection = DriverManager.getConnection("jdbc:postgresql://" + "172.31.28.130" + ":" + "5432" + "/qosdbc-log", "postgres", "ufc123");
+            qosdbc.commons.OutputMessage.println("qosdbc-coordinator: " + "connected to Log Service");
+        } catch (SQLException ex) {
+            qosdbc.commons.OutputMessage.println("ERROR: " + ex.getMessage());
+            System.exit(0);
+        } catch (ClassNotFoundException ex) {
+            qosdbc.commons.OutputMessage.println("ERROR: " + ex.getMessage());
+            System.exit(0);
+        }
+        return logConnection;
     }
 
 }

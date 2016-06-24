@@ -129,6 +129,9 @@ public class QoSDBCLoadBalancer {
       targetMap.remove(proxyId);
       OutputMessage.println("[LoadBalancer] Removed Tenant "
               + proxyId);
+      if (tenantMap.isEmpty()) {
+        OutputMessage.println("[LoadBalancer] All Tenants removed");
+      }
     }
   }
 

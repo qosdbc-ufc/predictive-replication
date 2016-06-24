@@ -18,6 +18,8 @@ import qosdbc.commons.jdbc.QoSDBCMessage.Request;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  *
@@ -44,8 +46,14 @@ public class QoSDBCConnectionProxy extends Thread {
   private List<String> tempLog;
   private boolean monitoringStarted = false;
   private String vmId;
-  private AtomicLong responseTimeSum;
-  private AtomicInteger responseTimeCount;
+
+  private Lock lock = null;
+
+  private long responseTimeSum = 0;
+  private long responseTimeCount = 0;
+
+  //private AtomicLong responseTimeSum;
+  //private AtomicLong responseTimeCount;
 
   /**
    *
@@ -69,8 +77,9 @@ public class QoSDBCConnectionProxy extends Thread {
     statementList = new Hashtable<Long, Statement>();
     resultSetList = new Hashtable<Long, ResultSet>();
     tempLog = Collections.synchronizedList(new ArrayList<String>());
-    responseTimeSum = new AtomicLong(0);
-    responseTimeCount = new AtomicInteger(0);
+    this.lock = new ReentrantLock();
+    //this.responseTimeSum = new AtomicLong(0);
+    //this.responseTimeCount = new AtomicLong(0);
   }
 
   /**
@@ -90,9 +99,9 @@ public class QoSDBCConnectionProxy extends Thread {
         switch (dbmsType) {
           case DatabaseSystem.TYPE_MYSQL: {
             if (dao != null) {
-              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, dao.getConnection().getAutoCommit());
+              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName + "?dontTrackOpenResources=true", dbName, "root", "ufc123", vmId, dao.getConnection().getAutoCommit());
             } else {
-              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
+              dao = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName + "?dontTrackOpenResources=true", dbName, "root", "ufc123", vmId, true);
             }
             foundDatabase = true;
             break;
@@ -234,6 +243,7 @@ public class QoSDBCConnectionProxy extends Thread {
         // reads the request from the stream
         Request msg = Request.parseDelimitedFrom(inputStream);
         Response.Builder response = Response.newBuilder();
+        if (msg == null) continue;
         if(!IsValidTenant(msg.getDatabase())) continue;
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
@@ -265,7 +275,7 @@ public class QoSDBCConnectionProxy extends Thread {
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               if (dao.getConnection().getAutoCommit()) {
-                changeDAO = true;
+                //changeDAO = true;
               }
               Statement statement = dao.getConnection().createStatement(); // AO MUDAR O DAO, ESTAMOS PERDENDO OS STATEMENTS
               //OutputMessage.println("[" + proxyId + "]: DAO-SC: " + dao.getVmId() + "/" + dao.getDbName() + "/" + dao.getId());
@@ -283,7 +293,7 @@ public class QoSDBCConnectionProxy extends Thread {
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               getStatement(Long.parseLong(msg.getParameters().get("statementId"))).close();
-              statementList.remove(Long.parseLong(msg.getParameters().get("statementId")));
+              Statement statement = statementList.remove(Long.parseLong(msg.getParameters().get("statementId")));
               //OutputMessage.println("[" + proxyId + "]: " + "SUCCESS: " + "SQL_STATEMENT_CLOSE");
             } catch (SQLException ex) {
               OutputMessage.println("[" + proxyId + "]: " + "FAILURE: " + "SQL_STATEMENT_CLOSE");
@@ -317,7 +327,8 @@ public class QoSDBCConnectionProxy extends Thread {
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               getResultSet(Long.parseLong(msg.getParameters().get("resultSetId"))).close();
-              resultSetList.remove(Long.parseLong(msg.getParameters().get("resultSetId")));
+              ResultSet rs = resultSetList.remove(Long.parseLong(msg.getParameters().get("resultSetId")));
+
             } catch (SQLException ex) {
               OutputMessage.println("[" + proxyId + "]: " + "FAILURE: " + "SQL_RESULTSET_CLOSE");
               response.setState(RequestCode.STATE_FAILURE);
@@ -328,7 +339,7 @@ public class QoSDBCConnectionProxy extends Thread {
             dao.commit();
             //OutputMessage.println("[" + proxyId + "]: DAO-C: " + dao.getVmId() + "/" + dao.getDbName() + "/" + dao.getId());
             if (!dao.getConnection().getAutoCommit()) {
-              changeDAO = true;
+              //changeDAO = true;
             }
             response.setState(RequestCode.STATE_SUCCESS);
             break;
@@ -337,7 +348,7 @@ public class QoSDBCConnectionProxy extends Thread {
             //OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
             dao.rollback();
             if (!dao.getConnection().getAutoCommit()) {
-              changeDAO = true;
+              //changeDAO = true;
             }
             response.setState(RequestCode.STATE_SUCCESS);
             break;
@@ -402,9 +413,12 @@ public class QoSDBCConnectionProxy extends Thread {
               monitoringStarted=true;
             }
 
-            this.responseTimeSum.addAndGet(finishTime - startTime);
-            this.responseTimeCount.incrementAndGet();
-            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime), msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(), response.getAffectedRows(), flagMigration);
+            lock.lock();
+              responseTimeSum += finishTime - startTime;
+              responseTimeCount = responseTimeCount + 1;
+            lock.unlock();
+
+            //log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime), msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(), response.getAffectedRows(), flagMigration);
           }
         }
 
@@ -452,7 +466,13 @@ public class QoSDBCConnectionProxy extends Thread {
     //qosdbcLoadBalancer.removeReplica(this.databaseName, dao);
     //dao.close();
     qosdbcService.removeConnectionProxy(this);
-    // OutputMessage.println("[" + proxyId + "]: Proxy connection ended");
+    try {
+      outputStream.close();
+      inputStream.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    OutputMessage.println("[" + proxyId + "]: Proxy connection ended");
     //pw.close();
   }
 
@@ -461,9 +481,10 @@ public class QoSDBCConnectionProxy extends Thread {
    * @param resultSet
    * @return
    */
-  private static List<Response.Row> transformResultSetToRowList(ResultSet resultSet) {
-    List<Response.Row> resultSetList = new ArrayList<Response.Row>();
+  private List<Response.Row> transformResultSetToRowList(ResultSet resultSet) {
+    List<Response.Row> resultSetList = null;
     try {
+      resultSetList = new ArrayList<Response.Row>(resultSet.getFetchSize());
       java.sql.ResultSetMetaData metaData = resultSet.getMetaData();
       while (resultSet.next()) {
         Response.Row.Builder row = Response.Row.newBuilder();
@@ -478,6 +499,7 @@ public class QoSDBCConnectionProxy extends Thread {
       }
       return resultSetList;
     } catch (SQLException ex) {
+      ex.printStackTrace();
     }
     return null;
   }
@@ -510,16 +532,30 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   private boolean IsValidTenant(String dbName) {
-    return !dbName.equals("information_schema")
-        && !dbName.equals("mysql")
+    return //!dbName.equals("information_schema")
+         !dbName.equals("mysql")
         && !dbName.equals("performance_schema");
   }
 
 
   public synchronized double getResponseTime() {
-    double rt = responseTimeSum.get() / (double)responseTimeCount.get();
-    responseTimeCount.set(0);
-    responseTimeSum.set(0);
+    double rt;
+    long sum;
+    long count;
+    lock.lock();
+      sum = responseTimeSum;
+      count = responseTimeCount;
+      responseTimeSum = 0;
+      responseTimeCount = 0;
+    lock.unlock();
+
+    if (count == 0) {
+      OutputMessage.println("[WARNING] " + this.databaseName +" count == 0");
+      return 0.0;
+    }
+    //OutputMessage.println(databaseName + " proxuSUM: " + (double)sum + " count: " + (double)count);
+    rt =  (double) sum / (double) count;
+
     return rt;
   }
 

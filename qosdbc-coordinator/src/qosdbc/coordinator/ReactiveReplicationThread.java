@@ -61,7 +61,7 @@ public class ReactiveReplicationThread extends Thread {
         OutputMessage.println("[ReactiveReplicationThread("+vmId+"/"+dbname+")] running...");
         startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         String rtOutput = "";
-        double series = 0;
+        double series;
         while (runThread) {
             try {
                 while(pauseThread) {
@@ -80,16 +80,19 @@ public class ReactiveReplicationThread extends Thread {
                 while(pauseThread) {
                     Thread.sleep(1000);
                 }
+                //OutputMessage.println("FINISH SlEEP " + dbname);
                 query_rts_start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                //OutputMessage.println("START QUERY RT " + dbname);
                 series = qosdbcService.getResponseTime(this.dbname);
+                //OutputMessage.println("FINISH QUERY RT " + dbname);
                 timeOfRt = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 /*if (series == null) {
                     OutputMessage.println("ERROR - NO DATA FOR ReactiveReplicationThread");
                     break;
                 }*/
+                rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
+                OutputMessage.println(rtOutput);
                 if (series >= 0) {
-                    rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
-                    OutputMessage.println(rtOutput);
                     if (series > this.sla) {
                         violations++;
                     } else {
@@ -105,9 +108,9 @@ public class ReactiveReplicationThread extends Thread {
 
                     }
                     logSla(series, timeOfRt);
-                    Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
-                    thread.start();
-                    thread.join();
+                    //Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                    //thread.start();
+                    //thread.join();
                     workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }

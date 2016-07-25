@@ -56,7 +56,6 @@ public class QoSDBCConnectionProxy extends Thread {
   //private AtomicLong responseTimeCount;
 
   /**
-   *
    * @param qosdbcService
    * @param dbConnection
    * @param catalogConnection
@@ -83,7 +82,6 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   /**
-   *
    * @param dbName
    * @return
    */
@@ -134,7 +132,6 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   /**
-   *
    * @param statementId
    * @return
    */
@@ -143,7 +140,6 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   /**
-   *
    * @param resultSetId
    * @return
    */
@@ -213,7 +209,7 @@ public class QoSDBCConnectionProxy extends Thread {
               OutputMessage.println("[" + proxyId + "]: Error " + ex.getMessage());
             }
           }
-         } // SYNCHRONIZED
+        } // SYNCHRONIZED
 
         if (changeDAO) {
           try {
@@ -244,7 +240,7 @@ public class QoSDBCConnectionProxy extends Thread {
         Request msg = Request.parseDelimitedFrom(inputStream);
         Response.Builder response = Response.newBuilder();
         if (msg == null) continue;
-        if(!IsValidTenant(msg.getDatabase())) continue;
+        if (!IsValidTenant(msg.getDatabase())) continue;
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
@@ -303,6 +299,8 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_RESULTSET_CREATE: {
             try {
+              // TODO(Serafim): if it returns false redirect the request to proper host
+              ApplyPendingUpdates(msg.getDatabase(), dao.getVmId());
               Statement statement = getStatement(Long.parseLong(msg.getParameters().get("statementId")));
               ResultSet resultSet = null;
               resultSet = statement.executeQuery(msg.getCommand());
@@ -355,6 +353,7 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_UPDATE: {
             int result;
+            QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
             result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
             if (result == -1) {
               //@gambiarra
@@ -391,12 +390,15 @@ public class QoSDBCConnectionProxy extends Thread {
         response.setStartTime(startTime);
         response.setFinishTime(finishTime);
 
-        if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE || msg.getCode() == RequestCode.SQL_RESULTSET_CREATE || msg.getCode() == RequestCode.SQL_COMMIT || msg.getCode() == RequestCode.SQL_ROLLBACK)) {
+        if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE ||
+            msg.getCode() == RequestCode.SQL_RESULTSET_CREATE ||
+            msg.getCode() == RequestCode.SQL_COMMIT ||
+            msg.getCode() == RequestCode.SQL_ROLLBACK)) {
           if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
             try {
               Statement statement = logConnection.createStatement();
               int result = statement.executeUpdate("DELETE FROM sql_log WHERE transaction_id = " + msg.getTransactionId());
-              if (result> 0) OutputMessage.println("[" + proxyId + "]: # OF ROWS DELETED: " + result);
+              if (result > 0) OutputMessage.println("[" + proxyId + "]: # OF ROWS DELETED: " + result);
               statement.close();
             } catch (SQLException ex) {
               OutputMessage.println("[" + proxyId + "]: ERROR while rollbacking on log!");
@@ -410,15 +412,17 @@ public class QoSDBCConnectionProxy extends Thread {
             }
             synchronized (this) {
               if (!monitoringStarted) this.qosdbcService.startMonitoring(this.vmId, this.databaseName);
-              monitoringStarted=true;
+              monitoringStarted = true;
             }
 
             lock.lock();
-              responseTimeSum += finishTime - startTime;
-              responseTimeCount = responseTimeCount + 1;
+            responseTimeSum += finishTime - startTime;
+            responseTimeCount = responseTimeCount + 1;
             lock.unlock();
 
-            //log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime), msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(), response.getAffectedRows(), flagMigration);
+            //log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime),
+            // msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
+            // response.getAffectedRows(), flagMigration);
           }
         }
 
@@ -477,7 +481,6 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   /**
-   *
    * @param resultSet
    * @return
    */
@@ -505,7 +508,6 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
   /**
-   *
    * @param sql
    */
   private void log(String sql, String vmId, String dbName, int requestCode, long responseTime, long slaResponseTime,
@@ -519,8 +521,8 @@ public class QoSDBCConnectionProxy extends Thread {
 
     //String sqlLog = "(" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + " , '" + vmId + "', '" + dbName + "', " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + ", '" + sql + "', " + requestCode + ", " + responseTime + ", " + slaResponseTime + ", " + (responseTime > slaResponseTime) + ", " + connectionId + ", " + transactionId + ", " + affectedRows + ", " + inMigration + ")";
     String sqlLog2 = "\"" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER + vmId + DELIMITER + dbName + DELIMITER + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER
-            + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
-            DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
+        + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
+        DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
     synchronized (tempLog) {
       tempLog.add(sqlLog2);
       //OutputMessage.println("Added(" + tempLog.size() +") " + sqlLog);
@@ -533,8 +535,8 @@ public class QoSDBCConnectionProxy extends Thread {
 
   private boolean IsValidTenant(String dbName) {
     return //!dbName.equals("information_schema")
-         !dbName.equals("mysql")
-        && !dbName.equals("performance_schema");
+        !dbName.equals("mysql")
+            && !dbName.equals("performance_schema");
   }
 
 
@@ -543,18 +545,18 @@ public class QoSDBCConnectionProxy extends Thread {
     long sum;
     long count;
     lock.lock();
-      sum = responseTimeSum;
-      count = responseTimeCount;
-      responseTimeSum = 0;
-      responseTimeCount = 0;
+    sum = responseTimeSum;
+    count = responseTimeCount;
+    responseTimeSum = 0;
+    responseTimeCount = 0;
     lock.unlock();
 
     if (count == 0) {
-      OutputMessage.println("[WARNING] " + this.databaseName +" count == 0");
+      OutputMessage.println("[WARNING] " + this.databaseName + " count == 0");
       return 0.0;
     }
     //OutputMessage.println(databaseName + " proxuSUM: " + (double)sum + " count: " + (double)count);
-    rt =  (double) sum / (double) count;
+    rt = (double) sum / (double) count;
 
     return rt;
   }
@@ -567,6 +569,20 @@ public class QoSDBCConnectionProxy extends Thread {
       tempLog.clear();
     }
     return copy;
+  }
+
+  public boolean ApplyPendingUpdates(String dbName, String vmId) {
+    ConcurrentLinkedQueue<Request> pendingRequestsQueue = QoSDBCService.consistencyService.getPendingRequestFor(dbName, vmId);
+    int result = 0;
+    while (!pendingRequestsQueue.isEmpty()) {
+      Request msg = pendingRequestsQueue.poll();
+      result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
+      if (result == -1) {
+        OutputMessage.println("[" + proxyId + "]: " + "FAILURE: ON UPDATE FOR CONSISTENCY << " + dbName + " => " + vmId);
+        return false;
+      }
+    }
+    return true;
   }
 
 }

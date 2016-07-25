@@ -42,6 +42,8 @@ public class QoSDBCService extends Thread {
     private boolean REACTIVE = true;
     ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
 
+    static ConsistencyService consistencyService = null;
+
     public QoSDBCService(int qosdbcPort, Connection catalogConnection, Connection logConnection) {
         this.qosdbcPort = qosdbcPort;
         this.catalogConnection = catalogConnection;
@@ -51,6 +53,7 @@ public class QoSDBCService extends Thread {
         forecastingThreads = new HashMap<String, QoSDBCForecaster>();
         reactiveReplicThreads = new  HashMap<String, ReactiveReplicationThread>();
         loggerThreads = new HashMap<String, QoSDBCLogger>();
+        consistencyService = new ConsistencyService();
 
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -77,6 +80,7 @@ public class QoSDBCService extends Thread {
                 switch (dbmsType) {
                     case DatabaseSystem.TYPE_MYSQL: {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
+                        consistencyService.addTenantAtHost(dbName, vmId);
                         if (IsValidDb(dbName)) {
                             if (REACTIVE) {
                                 ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(createConnectionToLog(),
@@ -374,5 +378,4 @@ public class QoSDBCService extends Thread {
         }
         return logConnection;
     }
-
 }

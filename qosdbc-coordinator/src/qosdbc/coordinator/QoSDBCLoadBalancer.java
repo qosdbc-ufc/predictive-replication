@@ -75,6 +75,7 @@ public class QoSDBCLoadBalancer {
     if (!replicasMap.containsKey(dbName)) {
       List<QoSDBCDatabaseProxy> connectionList = new ArrayList<QoSDBCDatabaseProxy>();
       connectionList.add(conn);
+      QoSDBCService.consistencyService.addTenantAtHost(dbName, conn.getVmId());
       replicasMap.put(dbName, connectionList);
     } else {
       List<QoSDBCDatabaseProxy> connectionList = replicasMap.get(dbName);
@@ -85,14 +86,11 @@ public class QoSDBCLoadBalancer {
   synchronized public void removeReplica(String dbName, QoSDBCDatabaseProxy conn) {
     if (tenantMap.containsKey(dbName)) {
       List<QoSDBCDatabaseProxy> connectionList = tenantMap.get(dbName);
-
       OutputMessage.println("[LoadBalancer] Removing connection: " + conn.getVmId() + "/" + conn.getDbName() + " left: " + connectionList.size());
       connectionList.remove(conn);
       conn.close();
       if (connectionList.isEmpty()) {
-
         tenantMap.remove(dbName);
-
         OutputMessage.println("[LoadBalancer] Removing from tenantMap: " + tenantMap.size());
       }
 

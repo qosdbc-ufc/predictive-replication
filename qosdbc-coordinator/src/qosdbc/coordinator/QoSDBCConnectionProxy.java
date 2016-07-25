@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  *
@@ -300,7 +301,7 @@ public class QoSDBCConnectionProxy extends Thread {
           case RequestCode.SQL_RESULTSET_CREATE: {
             try {
               // TODO(Serafim): if it returns false redirect the request to proper host
-              ApplyPendingUpdates(msg.getDatabase(), dao.getVmId());
+              ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
               Statement statement = getStatement(Long.parseLong(msg.getParameters().get("statementId")));
               ResultSet resultSet = null;
               resultSet = statement.executeQuery(msg.getCommand());
@@ -571,12 +572,12 @@ public class QoSDBCConnectionProxy extends Thread {
     return copy;
   }
 
-  public boolean ApplyPendingUpdates(String dbName, String vmId) {
-    ConcurrentLinkedQueue<Request> pendingRequestsQueue = QoSDBCService.consistencyService.getPendingRequestFor(dbName, vmId);
+  public boolean ApplyPendingUpdates(String dbName, String vmId, long time) {
+    // get pending updates that arrived before the current read request
+    ArrayList<Request> pendingUpdates = QoSDBCService.consistencyService.getPendingRequestFor(dbName, vmId, time);
     int result = 0;
-    while (!pendingRequestsQueue.isEmpty()) {
-      Request msg = pendingRequestsQueue.poll();
-      result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
+    for(Request update : pendingUpdates) {
+      result = dao.update(update.getCommand(), getStatement(Long.parseLong(update.getParameters().get("statementId"))));
       if (result == -1) {
         OutputMessage.println("[" + proxyId + "]: " + "FAILURE: ON UPDATE FOR CONSISTENCY << " + dbName + " => " + vmId);
         return false;
@@ -584,5 +585,4 @@ public class QoSDBCConnectionProxy extends Thread {
     }
     return true;
   }
-
 }

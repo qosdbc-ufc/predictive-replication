@@ -188,7 +188,6 @@ public class QoSDBCConnection implements Connection {
       this.autoCommit = !autoCommit;
       throw new SQLException("Failed to commit connection");
     }
-
   }
 
   @Override

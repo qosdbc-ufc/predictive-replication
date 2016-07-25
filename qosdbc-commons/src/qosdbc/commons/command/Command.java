@@ -2,7 +2,7 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package qosdbc.commons.data_structure.command;
+package qosdbc.commons.command;
 
 import java.io.Serializable;
 import java.util.HashMap;

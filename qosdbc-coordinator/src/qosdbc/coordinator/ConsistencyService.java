@@ -2,17 +2,19 @@ package qosdbc.coordinator;
 
 import qosdbc.commons.jdbc.QoSDBCMessage;
 import qosdbc.commons.Pair;
-import java.util.Iterator;
-import java.util.Map;
 
-import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 class ConsistencyService {
+  private Lock lock = null;
   private HashMap<Pair<String, String>, ConcurrentLinkedQueue<QoSDBCMessage.Request>> pendingUpdatesMap = null;
 
   public ConsistencyService() {
     this.pendingUpdatesMap = new HashMap<Pair<String, String>, ConcurrentLinkedQueue<QoSDBCMessage.Request>>();
+    this.lock = new ReentrantLock();
   }
 
   /**
@@ -39,10 +41,10 @@ class ConsistencyService {
     }
   }
 
-  public ConcurrentLinkedQueue<QoSDBCMessage.Request> getPendingRequestFor(String dbName, String host) {
+  public ArrayList<QoSDBCMessage.Request> getPendingRequestFor(String dbName, String host, long time) {
     Pair<String, String> replica =  new Pair<String, String>(dbName, host);
     if (pendingUpdatesMap.containsKey(replica)) {
-      return pendingUpdatesMap.get(replica);
+      return selectPendingRequests(pendingUpdatesMap.get(replica), time);
     }
     return null;
   }
@@ -52,5 +54,19 @@ class ConsistencyService {
     if (pendingUpdatesMap.containsKey(replica)) {
       pendingUpdatesMap.get(replica).clear();
     }
+  }
+
+  public ArrayList<QoSDBCMessage.Request> selectPendingRequests(ConcurrentLinkedQueue<QoSDBCMessage.Request> queue, long time) {
+    ArrayList<QoSDBCMessage.Request> ret = new ArrayList<QoSDBCMessage.Request>();
+    QoSDBCMessage.Request req = queue.peek();
+    while (req != null) {
+      if(req.getConnectionId() <= time) {
+        ret.add(queue.poll());
+      } else {
+        break;
+      }
+      req = queue.peek();
+    }
+    return ret;
   }
 }

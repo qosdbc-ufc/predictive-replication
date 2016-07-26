@@ -72,6 +72,7 @@ public class QoSDBCDatabaseProxy {
             int result = statement.executeUpdate(sql);
             return result;
         } catch (SQLException ex) {
+            OutputMessage.println("[QoSDBCDatabaseProxy] ERROR ON UPDATE\n" + ex.getMessage());
             return -1;
         }
         // @gabiarra

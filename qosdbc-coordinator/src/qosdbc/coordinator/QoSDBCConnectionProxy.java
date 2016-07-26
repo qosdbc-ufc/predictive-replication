@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
+import qosdbc.commons.PendingRequest;
 import qosdbc.commons.jdbc.*;
 import qosdbc.commons.jdbc.QoSDBCMessage.Response;
 import qosdbc.commons.jdbc.QoSDBCMessage.Request;
@@ -217,9 +218,12 @@ public class QoSDBCConnectionProxy extends Thread {
             boolean autoCommit = dao.getConnection().getAutoCommit();
             //OutputMessage.println("[" + proxyId + "]: changeDAO ");
             dao = qosdbcLoadBalancer.getTarget(this.proxyId, databaseName);
-            //OutputMessage.println("[" + proxyId + "]: Trying to get a dao...");
-            //OutputMessage.println("[" + proxyId + "]: GOT IT");
+            //OutputMessage.println("[" + proxyId + "]: DAO: " + dao.getVmId());
             Connection connection = dao.getConnection();
+            if (connection == null) {
+              // @gambi
+              break;
+            }
             connection.setAutoCommit(autoCommit);
             changeDAO = false;
             // Update the Statements to new connection
@@ -243,6 +247,8 @@ public class QoSDBCConnectionProxy extends Thread {
         if (msg == null) continue;
         if (!IsValidTenant(msg.getDatabase())) continue;
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+        long startSyncReplicas = 0;
+        long finishSyncReplicas = 0;
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
 
@@ -258,7 +264,7 @@ public class QoSDBCConnectionProxy extends Thread {
             break;
           }
           case RequestCode.SQL_CONNECTION_CLOSE: {
-            //qosdbcService.flushTempLogBlocking(this.dao.getDbName());
+            qosdbcService.flushTempLogBlocking(this.dao.getDbName());
             dao.rollback();
             if (dao != null && dao.isActive()) {
               //dao.close();
@@ -272,7 +278,7 @@ public class QoSDBCConnectionProxy extends Thread {
             response.setState(RequestCode.STATE_SUCCESS);
             try {
               if (dao.getConnection().getAutoCommit()) {
-                //changeDAO = true;
+                changeDAO = true;
               }
               Statement statement = dao.getConnection().createStatement(); // AO MUDAR O DAO, ESTAMOS PERDENDO OS STATEMENTS
               //OutputMessage.println("[" + proxyId + "]: DAO-SC: " + dao.getVmId() + "/" + dao.getDbName() + "/" + dao.getId());
@@ -301,7 +307,10 @@ public class QoSDBCConnectionProxy extends Thread {
           case RequestCode.SQL_RESULTSET_CREATE: {
             try {
               // TODO(Serafim): if it returns false redirect the request to proper host
+              startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
               ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
+              finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+
               Statement statement = getStatement(Long.parseLong(msg.getParameters().get("statementId")));
               ResultSet resultSet = null;
               resultSet = statement.executeQuery(msg.getCommand());
@@ -338,7 +347,7 @@ public class QoSDBCConnectionProxy extends Thread {
             dao.commit();
             //OutputMessage.println("[" + proxyId + "]: DAO-C: " + dao.getVmId() + "/" + dao.getDbName() + "/" + dao.getId());
             if (!dao.getConnection().getAutoCommit()) {
-              //changeDAO = true;
+              changeDAO = true;
             }
             response.setState(RequestCode.STATE_SUCCESS);
             break;
@@ -347,13 +356,16 @@ public class QoSDBCConnectionProxy extends Thread {
             //OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
             dao.rollback();
             if (!dao.getConnection().getAutoCommit()) {
-              //changeDAO = true;
+              changeDAO = true;
             }
             response.setState(RequestCode.STATE_SUCCESS);
             break;
           }
           case RequestCode.SQL_UPDATE: {
             int result;
+            startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+            ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
+            finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
             result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
             if (result == -1) {
@@ -417,13 +429,13 @@ public class QoSDBCConnectionProxy extends Thread {
             }
 
             lock.lock();
-            responseTimeSum += finishTime - startTime;
+            responseTimeSum += ((finishTime - startTime) - (finishSyncReplicas - startSyncReplicas));
             responseTimeCount = responseTimeCount + 1;
             lock.unlock();
 
-            //log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime),
-            // msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
-            // response.getAffectedRows(), flagMigration);
+            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime),
+             msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
+                    response.getAffectedRows(), flagMigration);
           }
         }
 
@@ -574,14 +586,38 @@ public class QoSDBCConnectionProxy extends Thread {
 
   public boolean ApplyPendingUpdates(String dbName, String vmId, long time) {
     // get pending updates that arrived before the current read request
-    ArrayList<Request> pendingUpdates = QoSDBCService.consistencyService.getPendingRequestFor(dbName, vmId, time);
+
+    ArrayList<PendingRequest> pendingUpdates = QoSDBCService.consistencyService.getPendingRequestFor(dbName, vmId, time);
+    if (pendingUpdates == null) {
+      OutputMessage.println("[ApplyPendingUpdates]: pendingUpdates NULL");
+      return false;
+    }
     int result = 0;
-    for(Request update : pendingUpdates) {
-      result = dao.update(update.getCommand(), getStatement(Long.parseLong(update.getParameters().get("statementId"))));
-      if (result == -1) {
-        OutputMessage.println("[" + proxyId + "]: " + "FAILURE: ON UPDATE FOR CONSISTENCY << " + dbName + " => " + vmId);
-        return false;
+    Statement state = null;
+    try {
+      state = dao.getConnection().createStatement();
+      if (state == null) {
+        OutputMessage.println("[ApplyPendingUpdates]: STATE NULL");
+        return true;
       }
+      if (dao == null) {
+        OutputMessage.println("[ApplyPendingUpdates]: DAO NULL");
+        return true;
+      }
+      for (PendingRequest update : pendingUpdates) {
+        if (update == null) {
+          OutputMessage.println("[ApplyPendingUpdates]: PendingRequest NULL");
+          return true;
+        }
+        state.addBatch(update.getCommand());
+      }
+      int[] res = state.executeBatch();
+      state.close();
+
+      //if ((finish - startTime) > 1000)
+      //  OutputMessage.println("[ApplyPendingUpdates]: DONE in " + (finish - startTime));
+    } catch(Exception ex) {
+      OutputMessage.println("[ApplyPendingUpdates]: " + ex.getMessage());
     }
     return true;
   }

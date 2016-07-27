@@ -6,8 +6,8 @@ package qosdbc.terminal.commands;
 
 import java.util.HashMap;
 import qosdbc.commons.OutputMessage;
-import qosdbc.commons.command.Command;
-import qosdbc.commons.command.CommandCode;
+import qosdbc.commons.data_structure.command.Command;
+import qosdbc.commons.data_structure.command.CommandCode;
 
 /**
  *

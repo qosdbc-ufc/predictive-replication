@@ -28,7 +28,7 @@ class ConsistencyService {
   public void addTenantAtHost(String dbName, String host) {
     Pair<String, String> replica =  new Pair<String, String>(dbName, host);
     if (!pendingUpdatesMap.containsKey(replica)) {
-      OutputMessage.println("[addTenantAtHost]: " + dbName + " << " + host);
+     // OutputMessage.println("[addTenantAtHost]: " + dbName + " << " + host);
       ConcurrentLinkedQueue<PendingRequest> queueOfPendingUpdates = new ConcurrentLinkedQueue<PendingRequest>();
       Lock newlock = new ReentrantLock();
       lock.lock();
@@ -48,7 +48,7 @@ class ConsistencyService {
       if (key.getLeft().equals(dbName) && !key.getRight().equals(host)) {
         PendingRequest pendingRequest = new PendingRequest(request.getTransactionId(), request.getCommand());
         ConcurrentLinkedQueue<PendingRequest> queue = (ConcurrentLinkedQueue<PendingRequest>)pair.getValue();
-        OutputMessage.println("[addPendingUpdate]: " + dbName + " << " + host);
+        //OutputMessage.println("[addPendingUpdate]: " + dbName + " << " + host);
         lockMap.get(key).lock();
           queue.add(pendingRequest);
         lockMap.get(key).unlock();
@@ -67,7 +67,7 @@ class ConsistencyService {
       OutputMessage.println(key.getLeft() + " << " + key.getRight());
     }*/
     if (pendingUpdatesMap.containsKey(replica)) {
-      OutputMessage.println("[getPendingRequestFor]: " + dbName + " << " + host);
+     // OutputMessage.println("[getPendingRequestFor]: " + dbName + " << " + host);
 
       ConcurrentLinkedQueue<PendingRequest> queue = pendingUpdatesMap.get(replica);
       lockMap.get(replica).lock();

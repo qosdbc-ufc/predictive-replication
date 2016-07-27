@@ -243,11 +243,12 @@ public class ReplicationThread extends Thread {
                 while (logResultSet.next()) {
                     String sql = logResultSet.getString("sql");
                     try {
-                        databaseStatement.executeUpdate(sql);
+                        databaseStatement.addBatch(sql);
                     } catch (SQLException ex) {
                     }
                     count++;
                 }
+                databaseStatement.executeBatch();
                 databaseStatement.close();
                 logResultSet.close();
                 logStatement.close();
@@ -294,14 +295,7 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: " + sqlDbActiveReplica);
                 Statement statement = catalogConnection.createStatement();
                 int dbActiveReplica = statement.executeUpdate(sqlDbActiveReplica);
-                QoSDBCDatabaseProxy newConn = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + destinationHost + ":3306/" +
-                        databaseName,
-                        databaseName,
-                        "root",
-                        "ufc123",
-                        destinationHost,
-                        loadBalancer.isAutoCommit(databaseName));
-                this.loadBalancer.addReplica(databaseName, newConn);
+                this.loadBalancer.addReplica(databaseName, destinationHost);
                 // int dbState = statement.executeUpdate(sqlDbState);
                 statement.close();
                 if (dbActiveReplica > 0) {

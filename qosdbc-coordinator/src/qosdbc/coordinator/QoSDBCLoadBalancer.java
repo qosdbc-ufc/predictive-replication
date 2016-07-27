@@ -28,8 +28,8 @@ public class QoSDBCLoadBalancer {
     replicasMap = new HashMap<String, List<QoSDBCDatabaseProxy>>();
   }
 
-  synchronized public QoSDBCDatabaseProxy getTarget(long proxyId, String dbName) {
-    if(!IsValidTenant(dbName)) return null;
+  public QoSDBCDatabaseProxy getTarget(long proxyId, String dbName) {
+    if (!IsValidTenant(dbName)) return null;
     if (!tenantMap.containsKey(proxyId)) {
       OutputMessage.println("[LoadBalancer] ERROR - There is no dbName = "
               + dbName + " monitored. Could not get connection to it.");
@@ -41,19 +41,19 @@ public class QoSDBCLoadBalancer {
       return connectionList.get(0);
     }
     int currentIndex = targetMap.get(proxyId);
-    if (currentIndex >= connectionList.size()-1) {
+    if (currentIndex >= connectionList.size() - 1) {
       currentIndex = 0;
     } else {
       currentIndex++;
     }
-    targetMap.put(proxyId, currentIndex);
+    targetMap.put(proxyId, currentIndex); // save the one it'll be using
     //OutputMessage.println("[LoadBalancer] Chosen target: " + currentIndex);
     return connectionList.get(currentIndex);
   }
 
   synchronized public void addTenant(long proxyId, String dbName, QoSDBCDatabaseProxy conn) {
-    if(!IsValidTenant(dbName)) return;
-    if(!tenantMap.containsKey(proxyId)) {
+    if (!IsValidTenant(dbName)) return;
+    if (!tenantMap.containsKey(proxyId)) {
       List<QoSDBCDatabaseProxy> connectionList = new ArrayList<QoSDBCDatabaseProxy>();
       connectionList.add(conn);
       targetMap.put(proxyId, 0);
@@ -63,23 +63,33 @@ public class QoSDBCLoadBalancer {
     }
   }
 
-  synchronized public void addReplica(String dbName, QoSDBCDatabaseProxy conn) {
-    if(!IsValidTenant(dbName)) return;
+  synchronized public void addReplica(String dbName, String destinationHost) {
+    if (!IsValidTenant(dbName)) return;
     Iterator it = tenantMap.entrySet().iterator();
+    ArrayList<QoSDBCDatabaseProxy> connList = new ArrayList<QoSDBCDatabaseProxy>();
     while (it.hasNext()) {
-      Map.Entry pair = (Map.Entry)it.next();
-      List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>)pair.getValue();
-      if (connectionList.get(0).getDbName().equals(dbName))
-        connectionList.add(conn);
+      Map.Entry pair = (Map.Entry) it.next();
+      List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>) pair.getValue();
+      if (connectionList.get(0).getDbName().equals(dbName)) {
+        try {
+          QoSDBCDatabaseProxy newConn = createNewConn(destinationHost,
+                  dbName,
+                  connectionList.get(0).getConnection().getAutoCommit());
+          connList.add(newConn);
+          connectionList.add(newConn);
+        } catch (Exception ex) {
+          OutputMessage.println("[QoSDBCLoadBalancer::addReplica]: ERROR");
+        }
+      }
     }
     if (!replicasMap.containsKey(dbName)) {
       List<QoSDBCDatabaseProxy> connectionList = new ArrayList<QoSDBCDatabaseProxy>();
-      connectionList.add(conn);
-      QoSDBCService.consistencyService.addTenantAtHost(dbName, conn.getVmId());
+      connectionList.addAll(connList);
+      QoSDBCService.consistencyService.addTenantAtHost(dbName, connList.get(0).getVmId());
       replicasMap.put(dbName, connectionList);
     } else {
       List<QoSDBCDatabaseProxy> connectionList = replicasMap.get(dbName);
-      connectionList.add(conn);
+      connectionList.addAll(connList);
     }
   }
 
@@ -111,8 +121,8 @@ public class QoSDBCLoadBalancer {
   synchronized public void removeAllReplicas() {
     Iterator it = replicasMap.entrySet().iterator();
     while (it.hasNext()) {
-      Map.Entry pair = (Map.Entry)it.next();
-      List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>)pair.getValue();
+      Map.Entry pair = (Map.Entry) it.next();
+      List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>) pair.getValue();
       for (QoSDBCDatabaseProxy conn : connectionList) {
         conn.close();
       }
@@ -121,7 +131,7 @@ public class QoSDBCLoadBalancer {
   }
 
   synchronized public void removeTenant(long proxyId) {
-    if(tenantMap.containsKey(proxyId)) {
+    if (tenantMap.containsKey(proxyId)) {
       tenantMap.get(proxyId).get(0).close();
       tenantMap.remove(proxyId);
       targetMap.remove(proxyId);
@@ -150,5 +160,18 @@ public class QoSDBCLoadBalancer {
     return !dbName.equals("information_schema")
             && !dbName.equals("mysql")
             && !dbName.equals("performance_schema");
+  }
+
+  public QoSDBCDatabaseProxy createNewConn(String destinationHost, String databaseName, boolean autoCommit) {
+    QoSDBCDatabaseProxy newConn = null;
+      newConn = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + destinationHost + ":3306/" +
+              databaseName,
+              databaseName,
+              "root",
+              "ufc123",
+              destinationHost,
+              autoCommit);
+
+    return newConn;
   }
 }

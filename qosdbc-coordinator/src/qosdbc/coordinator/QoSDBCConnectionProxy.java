@@ -305,15 +305,16 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_RESULTSET_CREATE: {
             try {
-              // TODO(Serafim): if it returns false redirect the request to proper host
+
               if (dao.getConnection().getAutoCommit()) {
                 changeDAO = true;
               }
-              /*
+
+              // TODO(Serafim): if it returns false redirect the request to proper host
               startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
               ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
               finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-              */
+
               Statement statement = getStatement(Long.parseLong(msg.getParameters().get("statementId")));
               ResultSet resultSet = null;
               resultSet = statement.executeQuery(msg.getCommand());
@@ -328,8 +329,8 @@ public class QoSDBCConnectionProxy extends Thread {
               }
             } catch (SQLException ex) {
               //pw.println(msg.getCommand());
-              OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + msg.getCommand());
-              OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + ex.getMessage());
+              //OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + msg.getCommand());
+              //OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + ex.getMessage());
               response.setState(RequestCode.STATE_FAILURE);
             }
             break;
@@ -366,19 +367,19 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_UPDATE: {
             int result;
-            /*
+
             startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
             finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
             QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
-            */
+
             result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
             if (result == -1) {
               //@gambiarra
               //result = 1; // TO DO ERROR IN CHANGE CONNECTION
               //pw.println(msg.getCommand());
-              OutputMessage.println("[" + proxyId + "]: " + "FAILURE: SQL_UPDATE << " + msg.getCommand());
+              //OutputMessage.println("[" + proxyId + "]: " + "FAILURE: SQL_UPDATE << " + msg.getCommand());
             } else {
             }
             response.setResultObject(result);
@@ -439,10 +440,11 @@ public class QoSDBCConnectionProxy extends Thread {
               responseTimeCount = responseTimeCount + 1;
             lock.unlock();
 
-
+            /*
             log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime),
              msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
                     response.getAffectedRows(), flagMigration);
+                    */
 
           }
         }
@@ -566,10 +568,10 @@ public class QoSDBCConnectionProxy extends Thread {
     long sum;
     long count;
     lock.lock();
-    sum = responseTimeSum;
-    count = responseTimeCount;
-    responseTimeSum = 0;
-    responseTimeCount = 0;
+      sum = responseTimeSum;
+      count = responseTimeCount;
+      responseTimeSum = 0;
+      responseTimeCount = 0;
     lock.unlock();
 
     if (count == 0) {

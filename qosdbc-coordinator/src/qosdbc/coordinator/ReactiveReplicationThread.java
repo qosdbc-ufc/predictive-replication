@@ -90,7 +90,7 @@ public class ReactiveReplicationThread extends Thread {
                     OutputMessage.println("ERROR - NO DATA FOR ReactiveReplicationThread");
                     break;
                 }*/
-                rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series;
+                rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series + " obtained in " + (timeOfRt - query_rts_start);
                 OutputMessage.println(rtOutput);
                 if (series >= 0) {
                     if (series > this.sla) {
@@ -108,9 +108,9 @@ public class ReactiveReplicationThread extends Thread {
 
                     }
                     logSla(series, timeOfRt);
-                    Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
-                    thread.start();
-                    thread.join();
+                    //Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                    //thread.start();
+                    //thread.join();
                     workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }

@@ -78,7 +78,7 @@ public class QoSDBCConnectionProxy extends Thread {
     statementList = new Hashtable<Long, Statement>();
     resultSetList = new Hashtable<Long, ResultSet>();
     tempLog = Collections.synchronizedList(new ArrayList<String>());
-    this.lock = new ReentrantLock();
+    this.lock = new ReentrantLock(true);
     //this.responseTimeSum = new AtomicLong(0);
     //this.responseTimeCount = new AtomicLong(0);
   }
@@ -214,12 +214,16 @@ public class QoSDBCConnectionProxy extends Thread {
         } // SYNCHRONIZED
 
         if (changeDAO) {
+          long changeDAOStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
           try {
             boolean autoCommit = dao.getConnection().getAutoCommit();
             //OutputMessage.println("[" + proxyId + "]: changeDAO ");
             dao = qosdbcLoadBalancer.getTarget(this.proxyId, databaseName);
             //OutputMessage.println("[" + proxyId + "]: DAO: " + dao.getVmId());
-            if (dao == null) {break;}
+            if (dao == null) {
+              OutputMessage.println("[" + proxyId + "]: [WARNING]: getTarget returned NULL");
+              break;
+            }
             Connection connection = dao.getConnection();
             if (connection == null) {
               // @gambi
@@ -239,14 +243,28 @@ public class QoSDBCConnectionProxy extends Thread {
             OutputMessage.println("[" + proxyId + "]: changeDAO " + ex.getMessage());
             System.exit(0);
           }
+          long changeDAOFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+          if (changeDAOFinish - changeDAOStart > 10000) {
+            OutputMessage.println("[" + proxyId + "]: [WARNING] changeDAO taking too LONG ");
+          }
         }
 
         // synchronized (this) { // SYNCHRONIZED
         // reads the request from the stream
         Request msg = Request.parseDelimitedFrom(inputStream);
         Response.Builder response = Response.newBuilder();
-        if (msg == null) continue;
-        if (!IsValidTenant(msg.getDatabase())) continue;
+        if (msg == null)  {
+          response.setState(RequestCode.STATE_SUCCESS);
+          response.build().writeDelimitedTo(outputStream);
+          outputStream.flush();
+          continue;
+        }
+        if (!IsValidTenant(msg.getDatabase())) {
+          response.setState(RequestCode.STATE_SUCCESS);
+          response.build().writeDelimitedTo(outputStream);
+          outputStream.flush();
+          continue;
+        }
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
         long startSyncReplicas = 0;
         long finishSyncReplicas = 0;
@@ -311,10 +329,11 @@ public class QoSDBCConnectionProxy extends Thread {
               }
 
               // TODO(Serafim): if it returns false redirect the request to proper host
+              /*
               startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
               ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
               finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-
+              */
               Statement statement = getStatement(Long.parseLong(msg.getParameters().get("statementId")));
               ResultSet resultSet = null;
               resultSet = statement.executeQuery(msg.getCommand());
@@ -367,13 +386,13 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_UPDATE: {
             int result;
-
+            /*
             startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
             finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
             QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
-
+            */
             result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
             if (result == -1) {
               //@gambiarra
@@ -440,11 +459,14 @@ public class QoSDBCConnectionProxy extends Thread {
               responseTimeCount = responseTimeCount + 1;
             lock.unlock();
 
-            /*
+            long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime),
              msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
                     response.getAffectedRows(), flagMigration);
-                    */
+            long finishLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+            if (finishLong - startLong > 30000) {
+              OutputMessage.println("[" + proxyId + "]: WARNING: Logging taking too long");
+            }
 
           }
         }
@@ -546,10 +568,10 @@ public class QoSDBCConnectionProxy extends Thread {
     String sqlLog2 = "\"" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER + vmId + DELIMITER + dbName + DELIMITER + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + DELIMITER
         + sql + DELIMITER + requestCode + DELIMITER + responseTime + DELIMITER + slaResponseTime + DELIMITER + (responseTime > slaResponseTime) + DELIMITER + connectionId + DELIMITER + transactionId +
         DELIMITER + affectedRows + DELIMITER + inMigration + "\"";
-    synchronized (tempLog) {
+
       tempLog.add(sqlLog2);
       //OutputMessage.println("Added(" + tempLog.size() +") " + sqlLog);
-    }
+
   }
 
   public QoSDBCDatabaseProxy getCurrentDAO() {
@@ -563,7 +585,7 @@ public class QoSDBCConnectionProxy extends Thread {
   }
 
 
-  public synchronized double getResponseTime() {
+  public double getResponseTime() {
     double rt;
     long sum;
     long count;
@@ -586,11 +608,9 @@ public class QoSDBCConnectionProxy extends Thread {
 
   public synchronized List<String> getTempLog() {
     List<String> copy;
-    synchronized (tempLog) {
-      copy = new ArrayList<String>(tempLog.size());
-      copy.addAll(tempLog);
-      tempLog.clear();
-    }
+    copy = new ArrayList<String>(tempLog.size());
+    copy.addAll(tempLog);
+    tempLog.clear();
     return copy;
   }
 

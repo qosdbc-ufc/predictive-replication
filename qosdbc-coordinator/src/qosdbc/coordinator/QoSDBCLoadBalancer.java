@@ -28,7 +28,7 @@ public class QoSDBCLoadBalancer {
     replicasMap = new HashMap<String, List<QoSDBCDatabaseProxy>>();
   }
 
-  public QoSDBCDatabaseProxy getTarget(long proxyId, String dbName) {
+  synchronized public QoSDBCDatabaseProxy getTarget(long proxyId, String dbName) {
     if (!IsValidTenant(dbName)) return null;
     if (!tenantMap.containsKey(proxyId)) {
       OutputMessage.println("[LoadBalancer] ERROR - There is no dbName = "

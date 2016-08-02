@@ -108,9 +108,9 @@ public class ReactiveReplicationThread extends Thread {
 
                     }
                     logSla(series, timeOfRt);
-                    //Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
-                    //thread.start();
-                    //thread.join();
+                    Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                    thread.start();
+                    thread.join();
                     workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }

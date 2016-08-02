@@ -63,16 +63,6 @@ CREATE TABLE sla_log (
 
 ALTER TABLE public.sla_log OWNER TO postgres;
 
-
-CREATE TABLE replica_sync (
-    "time" bigint,
-    db_name character varying,
-    sync_time bigint
-);
-
-
-ALTER TABLE public.replica_sync OWNER TO postgres;
-
 --
 -- Name: public; Type: ACL; Schema: -; Owner: postgres
 --

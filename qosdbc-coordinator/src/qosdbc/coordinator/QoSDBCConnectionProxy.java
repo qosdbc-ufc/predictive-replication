@@ -222,7 +222,7 @@ public class QoSDBCConnectionProxy extends Thread {
             //OutputMessage.println("[" + proxyId + "]: DAO: " + dao.getVmId());
             if (dao == null) {
               OutputMessage.println("[" + proxyId + "]: [WARNING]: getTarget returned NULL");
-              break;
+              System.exit(-1);
             }
             Connection connection = dao.getConnection();
             if (connection == null) {
@@ -283,7 +283,7 @@ public class QoSDBCConnectionProxy extends Thread {
             break;
           }
           case RequestCode.SQL_CONNECTION_CLOSE: {
-            qosdbcService.flushTempLogBlocking(this.dao.getDbName());
+            //qosdbcService.flushTempLogBlocking(this.dao.getDbName());
             dao.rollback();
             if (dao != null && dao.isActive()) {
               //dao.close();
@@ -329,11 +329,11 @@ public class QoSDBCConnectionProxy extends Thread {
               }
 
               // TODO(Serafim): if it returns false redirect the request to proper host
-              /*
+
               startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
               ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
               finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-              */
+
               Statement statement = getStatement(Long.parseLong(msg.getParameters().get("statementId")));
               ResultSet resultSet = null;
               resultSet = statement.executeQuery(msg.getCommand());
@@ -386,13 +386,13 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_UPDATE: {
             int result;
-            /*
+
             startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
             finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
             QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
-            */
+
             result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
             if (result == -1) {
               //@gambiarra
@@ -467,7 +467,6 @@ public class QoSDBCConnectionProxy extends Thread {
             if (finishLong - startLong > 30000) {
               OutputMessage.println("[" + proxyId + "]: WARNING: Logging taking too long");
             }
-
           }
         }
 
@@ -486,6 +485,7 @@ public class QoSDBCConnectionProxy extends Thread {
           //OutputMessage.println("[" + proxyId + "]: Closing proxy connection");
           if (dbConnection != null) {
             try {
+              if (dao.isActive()) dao.close(); //@gambi
               dbConnection.close();
             } catch (IOException ex1) {
               dbConnection = null;
@@ -650,5 +650,9 @@ public class QoSDBCConnectionProxy extends Thread {
       OutputMessage.println("[ApplyPendingUpdates]: " + ex.getMessage());
     }
     return true;
+  }
+
+  public String getVmId() {
+    return vmId;
   }
 }

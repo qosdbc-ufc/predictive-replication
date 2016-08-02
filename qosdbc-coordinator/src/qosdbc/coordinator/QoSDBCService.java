@@ -250,8 +250,8 @@ public class QoSDBCService extends Thread {
     }
 
     public synchronized void removeConnectionProxy(QoSDBCConnectionProxy proxy) {
-        String vmId = proxy.getCurrentDAO().getVmId();
-        String dbName = proxy.getCurrentDAO().getDbName();
+        String vmId = proxy.getVmId();
+        String dbName = proxy.getDatabaseName();
         connectionProxies.remove(proxy);
         OutputMessage.println("[SERVICE]: connectionProxies.size() = " + connectionProxies.size());
         if (connectionProxies.size() == 0) {
@@ -367,7 +367,7 @@ public class QoSDBCService extends Thread {
         Connection logConnection = null;
         try {
             Class.forName("org.postgresql.Driver");
-            logConnection = DriverManager.getConnection("jdbc:postgresql://" + "172.31.28.130" + ":" + "5432" + "/qosdbc-log", "postgres", "ufc123");
+            logConnection = DriverManager.getConnection("jdbc:postgresql://" + "172.31.37.249" + ":" + "5432" + "/qosdbc-log", "postgres", "ufc123");
             qosdbc.commons.OutputMessage.println("qosdbc-coordinator: " + "connected to Log Service");
         } catch (SQLException ex) {
             qosdbc.commons.OutputMessage.println("ERROR: " + ex.getMessage());

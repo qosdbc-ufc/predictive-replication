@@ -41,7 +41,6 @@ public class QoSDBCLogger extends Thread {
         this.qosdbcService = qosdbcService;
         this.vmId = vmId;
         this.dbname = dbname;
-
     }
 
     @Override
@@ -71,11 +70,15 @@ public class QoSDBCLogger extends Thread {
                     break;
                 }*/
                 if (series >= 0) {
-                    rtOutput = " [LoggerThread("+vmId+"/"+dbname+") Last sla: " + series;
-                    logSla(series, rtTime);
+                    rtOutput = " [LoggerThread(" + vmId + "/" + dbname + ") Last sla: " + series;
                     OutputMessage.println(rtOutput);
+                    logSla(series, rtTime);
+                    Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                    thread.start();
+                    Thread replicaSyncThread = this.qosdbcService.flushTempReplicaSyncLog(this.dbname);
+                    replicaSyncThread.start();
+                    thread.join();
                 }
-                this.qosdbcService.flushTempLog(this.dbname);
                 workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                 OutputMessage.println("WORK " + this.dbname + ": " + workTime);
             } catch (InterruptedException ex) {

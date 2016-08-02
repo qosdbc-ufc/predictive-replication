@@ -378,4 +378,15 @@ public class QoSDBCService extends Thread {
         }
         return logConnection;
     }
+
+    public synchronized Thread flushTempReplicaSyncLog(String dbName) {
+        List<ReplicaSyncLogEntry> temp = new ArrayList<ReplicaSyncLogEntry>();
+        for (QoSDBCConnectionProxy proxy : connectionProxies) {
+            if (proxy.getDatabaseName().equals(dbName)) {
+                temp.addAll(proxy.getReplicaSyncLogBuffer());
+            }
+        }
+        Thread thread = new Thread(new UpdateReplicaSyncLogThread(temp, this.logConnection, dbName));
+        return thread;
+    }
 }

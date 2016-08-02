@@ -48,8 +48,10 @@ public class QoSDBCConnectionProxy extends Thread {
   private List<String> tempLog;
   private boolean monitoringStarted = false;
   private String vmId;
-
   private Lock lock = null;
+  private Lock replicaSyncLock = null;
+  private List<ReplicaSyncLogEntry> replicaSyncLogBuffer = null;
+
 
   private long responseTimeSum = 0;
   private long responseTimeCount = 0;
@@ -78,7 +80,9 @@ public class QoSDBCConnectionProxy extends Thread {
     statementList = new Hashtable<Long, Statement>();
     resultSetList = new Hashtable<Long, ResultSet>();
     tempLog = Collections.synchronizedList(new ArrayList<String>());
+    replicaSyncLogBuffer = new ArrayList<ReplicaSyncLogEntry>();
     this.lock = new ReentrantLock(true);
+    replicaSyncLock = new ReentrantLock(true);
     //this.responseTimeSum = new AtomicLong(0);
     //this.responseTimeCount = new AtomicLong(0);
   }
@@ -654,5 +658,21 @@ public class QoSDBCConnectionProxy extends Thread {
 
   public String getVmId() {
     return vmId;
+  }
+
+  public void AddEntryToReplicaSyncLog(long time, String dbName, long syncTime) {
+    replicaSyncLock.lock();
+      this.replicaSyncLogBuffer.add(new ReplicaSyncLogEntry(time, dbName, syncTime));
+    replicaSyncLock.unlock();
+  }
+
+  public List<ReplicaSyncLogEntry> getReplicaSyncLogBuffer() {
+    List<ReplicaSyncLogEntry> copy = null;
+    replicaSyncLock.lock();
+      copy = new ArrayList<ReplicaSyncLogEntry>(replicaSyncLogBuffer.size());
+      copy.addAll(replicaSyncLogBuffer);
+      replicaSyncLogBuffer.clear();
+    replicaSyncLock.unlock();
+    return copy;
   }
 }

@@ -70,7 +70,6 @@ CREATE TABLE replica_sync (
     sync_time bigint
 );
 
-
 ALTER TABLE public.replica_sync OWNER TO postgres;
 
 --

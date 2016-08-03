@@ -323,7 +323,7 @@ public class ReplicationThread extends Thread {
             socketSourceAgent.close();
             long endTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             OutputMessage.println("[" + "ReplicationThread_" + this.getId()
-                    + "]: MIGRATION TOTAL TIME " + ((endTime - startTime) / 1000) + " secs");
+                    + "]: REPLICATION TOTAL TIME " + ((endTime - startTime) / 1000) + " secs");
         } catch (IOException ex) {
             ex.printStackTrace();
         } catch (ClassNotFoundException ex) {

@@ -204,13 +204,13 @@ public class QoSDBCConnectionProxy extends Thread {
           if (pause && lastRequestWasCommitOrRollback) {
             try {
               dao.commit();
-              OutputMessage.println("[" + proxyId + "]: PAUSED");
+              //OutputMessage.println("[" + proxyId + "]: PAUSED");
               flagMigration = false;
               wait();
               if (inMigration) {
                 flagMigration = true;
               }
-              OutputMessage.println("[" + proxyId + "]: PLAYED");
+              //OutputMessage.println("[" + proxyId + "]: PLAYED");
             } catch (InterruptedException ex) {
               OutputMessage.println("[" + proxyId + "]: Error " + ex.getMessage());
             }

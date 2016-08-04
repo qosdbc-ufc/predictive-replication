@@ -17,9 +17,9 @@ import qosdbc.commons.Database;
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
 import qosdbc.commons.ShellCommand;
-import qosdbc.commons.data_structure.command.Command;
-import qosdbc.commons.data_structure.command.CommandCode;
-import qosdbc.commons.data_structure.command.Return;
+import qosdbc.commons.command.Command;
+import qosdbc.commons.command.CommandCode;
+import qosdbc.commons.command.Return;
 
 /**
  *

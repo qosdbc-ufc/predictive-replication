@@ -8,6 +8,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import qosdbc.commons.DatabaseSystem;
@@ -37,9 +39,11 @@ public class ReactiveReplicationThread extends Thread {
     private long currentTime;
     private long windowTimestamp;
     private int timeToSleep;
-    int workTime = 0;
-    long query_rts_start;
-    long timeOfRt;
+    private int workTime = 0;
+    private long query_rts_start;
+    private long timeOfRt;
+    private ExecutorService sqlLogExecutor = null;
+    private ExecutorService replicaSyncLogExecutor = null;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -54,6 +58,8 @@ public class ReactiveReplicationThread extends Thread {
         this.vmId = vmId;
         this.dbname = dbname;
         this.sla = sla;
+        this.sqlLogExecutor = Executors.newSingleThreadExecutor();
+        this.replicaSyncLogExecutor = Executors.newSingleThreadExecutor();
     }
 
     @Override
@@ -107,12 +113,31 @@ public class ReactiveReplicationThread extends Thread {
                         }
 
                     }
+                    long logSlaStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                     logSla(series, timeOfRt);
-                    Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
-                    thread.start();
-                    Thread replicaSyncThread = this.qosdbcService.flushTempReplicaSyncLog(this.dbname);
-                    replicaSyncThread.start();
-                    thread.join();
+                    long logSlaFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                    OutputMessage.println("LogSla Time " + dbname + ": " + (logSlaFinish - logSlaStart));
+
+                    if(dbname.equals("tpcc")) {
+                        long sqlLogThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                        long sqlLogThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        OutputMessage.println("SqlLog Time " + dbname + ": " + (sqlLogThreadFinish - sqlLogThreadStart));
+
+                        if (dbname.equals("tpcc")) {
+                            thread.setPriority(Thread.MAX_PRIORITY);
+                        }
+                        sqlLogExecutor.submit(thread);
+                        sqlLogExecutor.shutdown();
+
+                        long replicaSyncThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        Thread replicaSyncThread = this.qosdbcService.flushTempReplicaSyncLog(this.dbname);
+                        replicaSyncLogExecutor.submit(replicaSyncThread);
+                        long replicaSyncThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        OutputMessage.println("ReplicaSync Time " + dbname + ": " + (replicaSyncThreadFinish - replicaSyncThreadStart));
+
+                        sqlLogExecutor.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
+                    }
                     workTime =  (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
                 }

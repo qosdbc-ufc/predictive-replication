@@ -458,8 +458,10 @@ public class QoSDBCConnectionProxy extends Thread {
               monitoringStarted = true;
             }
 
+            long replicaSyncTime = (finishSyncReplicas - startSyncReplicas);
+            AddEntryToReplicaSyncLog(startSyncReplicas, databaseName, replicaSyncTime);
             lock.lock();
-              responseTimeSum += ((finishTime - startTime) - (finishSyncReplicas - startSyncReplicas));
+              responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
               responseTimeCount = responseTimeCount + 1;
             lock.unlock();
 

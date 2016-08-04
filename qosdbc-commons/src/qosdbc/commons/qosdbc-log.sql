@@ -57,7 +57,8 @@ ALTER TABLE public.sql_log OWNER TO postgres;
 
 CREATE TABLE sla_log (
     db_name character varying,
-    response_time double precision
+    response_time double precision,
+	"time" bigint 
 );
 
 

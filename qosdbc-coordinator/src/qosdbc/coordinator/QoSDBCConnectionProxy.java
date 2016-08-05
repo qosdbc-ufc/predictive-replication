@@ -119,6 +119,7 @@ public class QoSDBCConnectionProxy extends Thread {
         if (dao.isActive() && foundDatabase) {
           databaseName = dbName;
           qosdbcLoadBalancer.addTenant(this.proxyId, dbName, dao);
+          QoSDBCService.consistencyService.addTenantAtHost(dbName, vmId);
           OutputMessage.println(dbName + " in " + vmId + " is connected");
           return dao;
         } else {

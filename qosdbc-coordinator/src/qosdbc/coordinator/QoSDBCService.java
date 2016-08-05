@@ -183,8 +183,9 @@ public class QoSDBCService extends Thread {
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.pause();
                 if (REACTIVE) {
-                    if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName()))
+                    if(reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).getState() == State.RUNNABLE) {
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
+                    }
                 } else {
                     if (loggerThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         loggerThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
@@ -215,8 +216,11 @@ public class QoSDBCService extends Thread {
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.play();
                 if (REACTIVE) {
-                    if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName()))
-                        reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();
+                    if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName())) {
+                        if(reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).getState() == State.WAITING) {
+                            reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).play();
+                        }
+                    }
                 } else {
                     if (loggerThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         loggerThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();

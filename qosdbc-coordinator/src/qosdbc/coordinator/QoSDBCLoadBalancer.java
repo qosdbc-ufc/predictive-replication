@@ -85,8 +85,8 @@ public class QoSDBCLoadBalancer {
     if (!replicasMap.containsKey(dbName)) {
       List<QoSDBCDatabaseProxy> connectionList = new ArrayList<QoSDBCDatabaseProxy>();
       connectionList.addAll(connList);
-      QoSDBCService.consistencyService.addTenantAtHost(dbName, connList.get(0).getVmId());
       replicasMap.put(dbName, connectionList);
+      QoSDBCService.consistencyService.addTenantAtHost(dbName, destinationHost);
     } else {
       List<QoSDBCDatabaseProxy> connectionList = replicasMap.get(dbName);
       connectionList.addAll(connList);

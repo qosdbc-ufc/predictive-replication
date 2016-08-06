@@ -119,7 +119,6 @@ public class QoSDBCConnectionProxy extends Thread {
         if (dao.isActive() && foundDatabase) {
           databaseName = dbName;
           qosdbcLoadBalancer.addTenant(this.proxyId, dbName, dao);
-          QoSDBCService.consistencyService.addTenantAtHost(dbName, vmId);
           OutputMessage.println(dbName + " in " + vmId + " is connected");
           return dao;
         } else {
@@ -205,13 +204,13 @@ public class QoSDBCConnectionProxy extends Thread {
           if (pause && lastRequestWasCommitOrRollback) {
             try {
               dao.commit();
-              //OutputMessage.println("[" + proxyId + "]: PAUSED");
+              OutputMessage.println("[" + proxyId + "]: PAUSED");
               flagMigration = false;
               wait();
               if (inMigration) {
                 flagMigration = true;
               }
-              //OutputMessage.println("[" + proxyId + "]: PLAYED");
+              OutputMessage.println("[" + proxyId + "]: PLAYED");
             } catch (InterruptedException ex) {
               OutputMessage.println("[" + proxyId + "]: Error " + ex.getMessage());
             }
@@ -256,18 +255,22 @@ public class QoSDBCConnectionProxy extends Thread {
 
         // synchronized (this) { // SYNCHRONIZED
         // reads the request from the stream
+        OutputMessage.println("[" + proxyId + "]: NEW MESSAGE RECEIVED 1");
         Request msg = Request.parseDelimitedFrom(inputStream);
+        OutputMessage.println("[" + proxyId + "]: NEW MESSAGE RECEIVED 2");
         Response.Builder response = Response.newBuilder();
         if (msg == null)  {
           response.setState(RequestCode.STATE_SUCCESS);
           response.build().writeDelimitedTo(outputStream);
           outputStream.flush();
+          OutputMessage.println("[" + proxyId + "]: NEW MESSAGE FAILED");
           continue;
         }
         if (!IsValidTenant(msg.getDatabase())) {
           response.setState(RequestCode.STATE_SUCCESS);
           response.build().writeDelimitedTo(outputStream);
           outputStream.flush();
+          OutputMessage.println("[" + proxyId + "]: IsValidTenant NEW MESSAGE FAILED");
           continue;
         }
         long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -396,8 +399,6 @@ public class QoSDBCConnectionProxy extends Thread {
             ApplyPendingUpdates(msg.getDatabase(), dao.getVmId(), msg.getTransactionId());
             finishSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
-            QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
-
             result = dao.update(msg.getCommand(), getStatement(Long.parseLong(msg.getParameters().get("statementId"))));
             if (result == -1) {
               //@gambiarra
@@ -405,6 +406,7 @@ public class QoSDBCConnectionProxy extends Thread {
               //pw.println(msg.getCommand());
               //OutputMessage.println("[" + proxyId + "]: " + "FAILURE: SQL_UPDATE << " + msg.getCommand());
             } else {
+              QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
             }
             response.setResultObject(result);
             response.setState(RequestCode.STATE_SUCCESS);
@@ -641,7 +643,8 @@ public class QoSDBCConnectionProxy extends Thread {
         OutputMessage.println("[ApplyPendingUpdates]: DAO NULL");
         return true;
       }
-      for (PendingRequest update : pendingUpdates) {
+      for (int i=0; i<pendingUpdates.size(); ++i) {
+        PendingRequest update = pendingUpdates.get(i);
         if (update == null) {
           OutputMessage.println("[ApplyPendingUpdates]: PendingRequest NULL");
           return true;

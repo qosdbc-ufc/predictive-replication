@@ -71,10 +71,8 @@ public class ReactiveReplicationThread extends Thread {
         while (runThread) {
             try {
                 synchronized (this) { // SYNCHRONIZED
-                    if (pauseThread) {
-                        OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " will wait");
+                    while (pauseThread) {
                         wait();
-                        OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " will continue");
                     }
                 }
 
@@ -88,10 +86,8 @@ public class ReactiveReplicationThread extends Thread {
                     OutputMessage.println("WARNING: " + dbname + " " + "WorkTime larger than sleep");
                 }
                 synchronized (this) { // SYNCHRONIZED
-                    if (pauseThread) {
-                        OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " will wait");
+                    while (pauseThread) {
                         wait();
-                        OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " will continue");
                     }
                 }
                 //OutputMessage.println("FINISH SlEEP " + dbname);
@@ -126,26 +122,26 @@ public class ReactiveReplicationThread extends Thread {
                     OutputMessage.println("LogSla Time " + dbname + ": " + (logSlaFinish - logSlaStart));
 
                     //if(dbname.equals("tpcc")) {
-                        long sqlLogThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-                        Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
+                    long sqlLogThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                    Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
 
-                        if (dbname.equals("tpcc")) {
-                            thread.setPriority(Thread.MAX_PRIORITY);
-                        }
+                    if (dbname.equals("tpcc")) {
+                        thread.setPriority(Thread.MAX_PRIORITY);
+                    }
                     long sqlLogThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                     thread.start();
-                        OutputMessage.println("SqlLog Time " + dbname + ": " + (sqlLogThreadFinish - sqlLogThreadStart));
+                    OutputMessage.println("SqlLog Time " + dbname + ": " + (sqlLogThreadFinish - sqlLogThreadStart));
 
-                        //sqlLogExecutor.submit(thread);
-                        //sqlLogExecutor.shutdown();
+                    //sqlLogExecutor.submit(thread);
+                    //sqlLogExecutor.shutdown();
 
-                        long replicaSyncThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-                        Thread replicaSyncThread = this.qosdbcService.flushTempReplicaSyncLog(this.dbname);
-                        //replicaSyncLogExecutor.submit(replicaSyncThread);
-                        replicaSyncThread.join();
-                        long replicaSyncThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-                        OutputMessage.println("ReplicaSync Time " + dbname + ": " + (replicaSyncThreadFinish - replicaSyncThreadStart));
-                        thread.join();
+                    long replicaSyncThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                    Thread replicaSyncThread = this.qosdbcService.flushTempReplicaSyncLog(this.dbname);
+                    //replicaSyncLogExecutor.submit(replicaSyncThread);
+                    replicaSyncThread.join();
+                    long replicaSyncThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                    OutputMessage.println("ReplicaSync Time " + dbname + ": " + (replicaSyncThreadFinish - replicaSyncThreadStart));
+                    thread.join();
                         //sqlLogExecutor.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
                     //}
                     workTime = (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
@@ -155,8 +151,6 @@ public class ReactiveReplicationThread extends Thread {
                 OutputMessage.println("ERROR - Error in ReactiveReplicationThread thread");
             }
         }
-
-
     }
 
 
@@ -285,8 +279,8 @@ public class ReactiveReplicationThread extends Thread {
 
     public void pauseThread() {
         synchronized (this) {
-            pauseThread = true;
             OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " paused");
+            pauseThread = true;
         }
     }
 
@@ -346,9 +340,9 @@ public class ReactiveReplicationThread extends Thread {
 
     public void play() {
         synchronized (this) {
+            OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " played");
             pauseThread = false;
             notify();
-            OutputMessage.println("[ReactiveReplicationThread]: " + dbname + " played");
         }
     }
 }

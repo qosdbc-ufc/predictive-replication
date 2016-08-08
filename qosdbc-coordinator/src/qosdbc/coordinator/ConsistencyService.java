@@ -69,12 +69,12 @@ class ConsistencyService {
 
     lock.lock();
       if (pendingUpdatesMap.containsKey(replica)) {
-       // OutputMessage.println("[getPendingRequestFor]: " + dbName + " << " + host);
-
+        //OutputMessage.println("[getPendingRequestFor]: " + dbName + " << " + host);
         ConcurrentLinkedQueue<PendingRequest> queue = pendingUpdatesMap.get(replica);
         lockMap.get(replica).lock();
           ArrayList<PendingRequest> list = selectPendingRequests(queue, time);
         lockMap.get(replica).unlock();
+        lock.unlock();
         return list;
       }
     lock.unlock();

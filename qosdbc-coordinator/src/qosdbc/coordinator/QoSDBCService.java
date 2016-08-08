@@ -178,20 +178,22 @@ public class QoSDBCService extends Thread {
 
     public void pauseDatabaseConnections(String dbName) {
         int numberOfConnections = 0;
+        int control = 0;
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.pause();
-                if (REACTIVE) {
-                    if(reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).getState() == State.RUNNABLE) {
+                /*if (REACTIVE) {
+                    if(control == 0) {
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
+                        control++;
                     }
                 } else {
                     if (loggerThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         loggerThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).pauseForecaster();
-                }
+                }*/
                 numberOfConnections++;
             }
         }
@@ -211,22 +213,22 @@ public class QoSDBCService extends Thread {
 
     public void playDatabaseConnections(String dbName) {
         int numberOfConnections = 0;
+        int control = 0;
         for (QoSDBCConnectionProxy proxy : connectionProxies) {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.play();
-                if (REACTIVE) {
-                    if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName())) {
-                        if(reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).getState() != State.RUNNABLE) {
-                            reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).play();
-                        }
+                /*if (REACTIVE) {
+                    if (control==0) {
+                        reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).play();
+                        control++;
                     }
                 } else {
                     if (loggerThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         loggerThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).resumeForecaster();
-                }
+                }*/
                 numberOfConnections++;
             }
         }

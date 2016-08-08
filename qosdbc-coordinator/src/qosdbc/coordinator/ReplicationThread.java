@@ -205,7 +205,7 @@ public class ReplicationThread extends Thread {
                 case CommandCode.STATE_SUCCESS: {
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: DATABASE_RESTORE Success");
                     break;
-                }
+                }Sync
                 case CommandCode.STATE_FAILURE: {
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: DATABASE_RESTORE Success");
                     break;

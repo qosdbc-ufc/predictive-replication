@@ -217,7 +217,7 @@ public class QoSDBCService extends Thread {
                 proxy.play();
                 if (REACTIVE) {
                     if (reactiveReplicThreads.containsKey(dao.getVmId() + dao.getDbName())) {
-                        if(reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).getState() == State.WAITING) {
+                        if(reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).getState() != State.RUNNABLE) {
                             reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).play();
                         }
                     }

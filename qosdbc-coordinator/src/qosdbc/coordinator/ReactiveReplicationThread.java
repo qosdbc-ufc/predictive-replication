@@ -71,7 +71,7 @@ public class ReactiveReplicationThread extends Thread {
         while (runThread) {
             try {
                 synchronized (this) { // SYNCHRONIZED
-                    while (pauseThread) {
+                    if (pauseThread) {
                         wait();
                     }
                 }

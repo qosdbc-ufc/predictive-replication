@@ -210,6 +210,7 @@ public class QoSDBCConnectionProxy extends Thread {
               if (inMigration) {
                 flagMigration = true;
               }
+              changeDAO = false;
               OutputMessage.println("[" + proxyId + "]: PLAYED");
             } catch (InterruptedException ex) {
               OutputMessage.println("[" + proxyId + "]: Error " + ex.getMessage());
@@ -231,6 +232,7 @@ public class QoSDBCConnectionProxy extends Thread {
             Connection connection = dao.getConnection();
             if (connection == null) {
               // @gambi
+              OutputMessage.println("[" + proxyId + "]: [WARNING]: changeDAO dao.getConnection() NULL");
               break;
             }
             connection.setAutoCommit(autoCommit);
@@ -259,7 +261,7 @@ public class QoSDBCConnectionProxy extends Thread {
         Request msg = Request.parseDelimitedFrom(inputStream);
         OutputMessage.println("[" + proxyId + "]: NEW MESSAGE RECEIVED 2");
         Response.Builder response = Response.newBuilder();
-        if (msg == null)  {
+        if (msg == null) {
           response.setState(RequestCode.STATE_SUCCESS);
           response.build().writeDelimitedTo(outputStream);
           outputStream.flush();
@@ -457,19 +459,21 @@ public class QoSDBCConnectionProxy extends Thread {
               command = "ROLLBACK";
             }
             synchronized (this) {
-              if (!monitoringStarted) this.qosdbcService.startMonitoring(this.vmId, this.databaseName);
-              monitoringStarted = true;
+              if (!monitoringStarted) {
+                this.qosdbcService.startMonitoring(this.vmId, this.databaseName);
+                monitoringStarted = true;
+              }
             }
 
             long replicaSyncTime = (finishSyncReplicas - startSyncReplicas);
             AddEntryToReplicaSyncLog(startSyncReplicas, databaseName, replicaSyncTime);
             lock.lock();
               responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
-              responseTimeCount = responseTimeCount + 1;
+              responseTimeCount++;
             lock.unlock();
 
             long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), (finishTime - startTime),
+            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), ((finishTime - startTime) - replicaSyncTime),
              msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
                     response.getAffectedRows(), flagMigration);
             long finishLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -479,16 +483,17 @@ public class QoSDBCConnectionProxy extends Thread {
           }
         }
 
-        // sends response through the stream
-        response.build().writeDelimitedTo(outputStream);
-        outputStream.flush();
-
         if (msg.getCode() == RequestCode.SQL_ROLLBACK ||
             msg.getCode() == RequestCode.SQL_COMMIT) {
           this.lastRequestWasCommitOrRollback = true;
         } else {
           this.lastRequestWasCommitOrRollback = false;
         }
+
+        // sends response through the stream
+        response.build().writeDelimitedTo(outputStream);
+        outputStream.flush();
+
 
         if (closeConnection) {
           //OutputMessage.println("[" + proxyId + "]: Closing proxy connection");
@@ -595,9 +600,9 @@ public class QoSDBCConnectionProxy extends Thread {
 
 
   public double getResponseTime() {
-    double rt;
-    long sum;
-    long count;
+    double rt = 0.0;
+    long sum = 0;
+    long count = 0;
     lock.lock();
       sum = responseTimeSum;
       count = responseTimeCount;

@@ -138,7 +138,7 @@ public class ReactiveReplicationThread extends Thread {
                     long replicaSyncThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                     Thread replicaSyncThread = this.qosdbcService.flushTempReplicaSyncLog(this.dbname);
                     //replicaSyncLogExecutor.submit(replicaSyncThread);
-                    replicaSyncThread.join();
+                    replicaSyncThread.start();
                     long replicaSyncThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                     OutputMessage.println("ReplicaSync Time " + dbname + ": " + (replicaSyncThreadFinish - replicaSyncThreadStart));
                     thread.join();

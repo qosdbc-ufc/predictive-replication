@@ -658,15 +658,22 @@ public class QoSDBCConnectionProxy extends Thread {
           OutputMessage.println("[ApplyPendingUpdates]: PendingRequest NULL");
           return true;
         }
-        state.addBatch(update.getCommand());
+        try {
+          state.executeUpdate(update.getCommand());
+        } catch (SQLException e) {
+          // go on
+        }
       }
-      int[] res = state.executeBatch();
-      state.close();
-
       //if ((finish - startTime) > 1000)
       //  OutputMessage.println("[ApplyPendingUpdates]: DONE in " + (finish - startTime));
-    } catch(Exception ex) {
-      OutputMessage.println("[ApplyPendingUpdates]: " + ex.getMessage());
+    } catch (Exception ex) {
+      // OutputMessage.println("[ApplyPendingUpdates]: " + ex.getMessage());
+    } finally {
+      try {
+        state.close();
+      } catch (SQLException e) {
+        // log or ignore, we can't do anything about it really
+      }
     }
     return true;
   }

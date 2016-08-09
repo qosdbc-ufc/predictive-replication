@@ -183,7 +183,7 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.pause();
-                /*if (REACTIVE) {
+                if (REACTIVE) {
                     if(control == 0) {
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
                         control++;
@@ -193,7 +193,7 @@ public class QoSDBCService extends Thread {
                         loggerThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).pauseForecaster();
-                }*/
+                }
                 numberOfConnections++;
             }
         }
@@ -218,7 +218,7 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.play();
-                /*if (REACTIVE) {
+                if (REACTIVE) {
                     if (control==0) {
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).play();
                         control++;
@@ -228,7 +228,7 @@ public class QoSDBCService extends Thread {
                         loggerThreads.get(dao.getVmId() + dao.getDbName()).resumeThread();
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).resumeForecaster();
-                }*/
+                }
                 numberOfConnections++;
             }
         }

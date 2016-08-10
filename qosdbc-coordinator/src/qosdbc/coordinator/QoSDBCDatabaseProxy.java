@@ -84,6 +84,7 @@ public class QoSDBCDatabaseProxy {
             connection.close();
         } catch (SQLException ex) {
         }
+        }
     }
 
     public synchronized void commit() {

@@ -29,7 +29,7 @@ public class UpdateReplicaSyncLogThread implements Runnable {
 
     public void run() {
         if (tempLog.isEmpty()) return;
-        OutputMessage.println("[UpdateReplicaSyncLogThread] Rows: " + tempLog.size());
+        OutputMessage.println("[UpdateReplicaSyncLogThread] "+ dbName +" Rows: " + tempLog.size());
         Statement statement = null;
         try {
             statement = logConnection.createStatement();
@@ -41,7 +41,7 @@ public class UpdateReplicaSyncLogThread implements Runnable {
             }
             int[] count = statement.executeBatch();
         } catch (SQLException e) {
-            OutputMessage.println("[UpdateReplicaSyncLogThread] SQLException: " + e.getMessage());
+            OutputMessage.println("[UpdateReplicaSyncLogThread] " + dbName + " SQLException: " + e.getMessage());
         }
     }
 }

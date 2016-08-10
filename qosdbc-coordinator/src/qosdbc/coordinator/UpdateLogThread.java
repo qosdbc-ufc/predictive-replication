@@ -29,7 +29,7 @@ public class UpdateLogThread implements Runnable {
     public void run() {
         if (tempLog.isEmpty()) return;
 
-        OutputMessage.println("[UpdateLogThread] Rows: " + tempLog.size());
+        OutputMessage.println("[UpdateLogThread] " + dbName + " Rows: " + tempLog.size());
         try {
             String fname = "/home/ubuntu/temp/temp" + (TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
                     + ThreadLocalRandom.current().nextInt(1, 1000000 + 1)) + ".csv";

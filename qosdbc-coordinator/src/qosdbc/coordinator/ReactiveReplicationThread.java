@@ -44,6 +44,7 @@ public class ReactiveReplicationThread extends Thread {
     private long timeOfRt;
     private ExecutorService sqlLogExecutor = null;
     private ExecutorService replicaSyncLogExecutor = null;
+    private int warmingResponseTime = 3;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -103,23 +104,28 @@ public class ReactiveReplicationThread extends Thread {
                 rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series + " obtained in " + (timeOfRt - query_rts_start);
                 OutputMessage.println(rtOutput);
                 if (series >= 0) {
-                    if (series > this.sla) {
-                        violations++;
-                    } else {
-                        violations = 0;
-                    }
 
-                    if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
-                        violations = 0;
-                        if (numberOfReplicas < 1) {
-                            numberOfReplicas++;
-                            createReplica();
+                    if (warmingResponseTime == 0) {
+                        if (series > this.sla) {
+                            violations++;
+                        } else {
+                            violations = 0;
                         }
+
+                        if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
+                            violations = 0;
+                            if (numberOfReplicas < 1) {
+                                numberOfReplicas++;
+                                createReplica();
+                            }
+                        }
+                        long logSlaStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        logSla(series, timeOfRt);
+                        long logSlaFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                        OutputMessage.println("LogSla Time " + dbname + ": " + (logSlaFinish - logSlaStart));
+                    } else {
+                        warmingResponseTime--;
                     }
-                    long logSlaStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-                    logSla(series, timeOfRt);
-                    long logSlaFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-                    OutputMessage.println("LogSla Time " + dbname + ": " + (logSlaFinish - logSlaStart));
 
                     //if(dbname.equals("tpcc")) {
                     long sqlLogThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());

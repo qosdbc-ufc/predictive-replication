@@ -91,6 +91,7 @@ public class QoSDBCLoadBalancer {
       List<QoSDBCDatabaseProxy> connectionList = replicasMap.get(dbName);
       connectionList.addAll(connList);
     }
+    OutputMessage.println("[QoSDBCLoadBalancer::addReplica]: SUCCESS");
   }
 
   synchronized public void removeReplica(String dbName, QoSDBCDatabaseProxy conn) {

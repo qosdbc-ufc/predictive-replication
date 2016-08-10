@@ -361,8 +361,8 @@ public class QoSDBCConnectionProxy extends Thread {
               }
             } catch (SQLException ex) {
               //pw.println(msg.getCommand());
-              OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + msg.getCommand());
-              OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + ex.getMessage());
+              //OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + msg.getCommand());
+              //OutputMessage.println("[" + proxyId + "]: " + "SQLException: " + ex.getMessage());
               response.setState(RequestCode.STATE_FAILURE);
             }
             break;
@@ -409,7 +409,7 @@ public class QoSDBCConnectionProxy extends Thread {
               //@gambiarra
               result = 1; // TO DO ERROR IN CHANGE CONNECTION
               //pw.println(msg.getCommand());
-              OutputMessage.println("[" + proxyId + "]: " + "FAILURE: SQL_UPDATE << " + msg.getCommand());
+              //OutputMessage.println("[" + proxyId + "]: " + "FAILURE: SQL_UPDATE << " + msg.getCommand());
             } else {
               QoSDBCService.consistencyService.addPendingUpdate(msg.getDatabase(), dao.getVmId(), msg);
             }

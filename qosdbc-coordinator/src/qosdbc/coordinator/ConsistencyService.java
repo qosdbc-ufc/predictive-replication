@@ -92,7 +92,7 @@ class ConsistencyService {
     ArrayList<PendingRequest> ret = new ArrayList<PendingRequest>();
     PendingRequest req = queue.peek();
     while (req != null) {
-      if(req.getTransactionId() <= time) {
+      if(req.getTransactionId() < time) {
         ret.add(queue.poll());
       } else {
         break;

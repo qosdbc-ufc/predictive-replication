@@ -71,11 +71,6 @@ public class ReactiveReplicationThread extends Thread {
         double series;
         while (runThread) {
             try {
-                synchronized (this) { // SYNCHRONIZED
-                    if (pauseThread) {
-                        wait();
-                    }
-                }
 
                 rtOutput = "";
                 // seconds to sleep
@@ -86,11 +81,7 @@ public class ReactiveReplicationThread extends Thread {
                 } else {
                     OutputMessage.println("WARNING: " + dbname + " " + "WorkTime larger than sleep");
                 }
-                synchronized (this) { // SYNCHRONIZED
-                    while (pauseThread) {
-                        wait();
-                    }
-                }
+
                 //OutputMessage.println("FINISH SlEEP " + dbname);
                 query_rts_start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 //OutputMessage.println("START QUERY RT " + dbname);
@@ -130,7 +121,6 @@ public class ReactiveReplicationThread extends Thread {
                     //if(dbname.equals("tpcc")) {
                     long sqlLogThreadStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                     Thread thread = this.qosdbcService.flushTempLogBlocking(this.dbname);
-
                     if (dbname.equals("tpcc")) {
                         thread.setPriority(Thread.MAX_PRIORITY);
                     }
@@ -147,7 +137,7 @@ public class ReactiveReplicationThread extends Thread {
                     replicaSyncThread.start();
                     long replicaSyncThreadFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                     OutputMessage.println("ReplicaSync Time " + dbname + ": " + (replicaSyncThreadFinish - replicaSyncThreadStart));
-                    thread.join();
+
                         //sqlLogExecutor.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
                     //}
                     workTime = (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);

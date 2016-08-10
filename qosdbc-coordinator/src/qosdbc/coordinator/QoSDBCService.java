@@ -41,6 +41,7 @@ public class QoSDBCService extends Thread {
     HashMap<String, QoSDBCLogger> loggerThreads = null;
     private boolean REACTIVE = true;
     ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+    private HashMap<String, List<Thread>>  loggingThreadMap = null;
 
     static ConsistencyService consistencyService = null;
 
@@ -54,6 +55,7 @@ public class QoSDBCService extends Thread {
         reactiveReplicThreads = new  HashMap<String, ReactiveReplicationThread>();
         loggerThreads = new HashMap<String, QoSDBCLogger>();
         consistencyService = new ConsistencyService();
+        loggingThreadMap = new HashMap<String, List<Thread>>();
 
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -82,6 +84,10 @@ public class QoSDBCService extends Thread {
                         databaseProxy = new QoSDBCDatabaseProxy("com.mysql.jdbc.Driver", "jdbc:mysql://" + vmId + ":3306/" + dbName, dbName, "root", "ufc123", vmId, true);
                         consistencyService.addTenantAtHost(dbName, vmId);
                         if (IsValidDb(dbName)) {
+
+                            ArrayList<Thread> loggingThreadList = new ArrayList<Thread>();
+                            this.loggingThreadMap.put(dbName, loggingThreadList);
+
                             if (REACTIVE) {
                                 ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(createConnectionToLog(),
                                         catalogConnection,
@@ -183,6 +189,7 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.pause();
+                /*
                 if (REACTIVE) {
                     if(control == 0) {
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).pauseThread();
@@ -194,6 +201,7 @@ public class QoSDBCService extends Thread {
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).pauseForecaster();
                 }
+                */
                 numberOfConnections++;
             }
         }
@@ -218,6 +226,7 @@ public class QoSDBCService extends Thread {
             QoSDBCDatabaseProxy dao = proxy.getCurrentDAO();
             if (dao != null && dao.getDbName().equals(dbName)) {
                 proxy.play();
+                /*
                 if (REACTIVE) {
                     if (control==0) {
                         reactiveReplicThreads.get(dao.getVmId() + dao.getDbName()).play();
@@ -229,6 +238,7 @@ public class QoSDBCService extends Thread {
                     if (forecastingThreads.containsKey(dao.getVmId() + dao.getDbName()))
                         forecastingThreads.get(dao.getVmId() + dao.getDbName()).resumeForecaster();
                 }
+                */
                 numberOfConnections++;
             }
         }
@@ -264,6 +274,7 @@ public class QoSDBCService extends Thread {
             OutputMessage.println("[SERVICE]: All proxies FINISHED");
             this.qosdbcLoadBalancer.removeAllReplicas();
             //finishExecutor();
+            /*
             if (REACTIVE) {
                 if (reactiveReplicThreads.containsKey(vmId+dbName)) {
                     Thread forecasterThread = reactiveReplicThreads.get(vmId+dbName);
@@ -276,7 +287,7 @@ public class QoSDBCService extends Thread {
                     if (forecasterThread != null) forecasterThread.stop();
                     forecastingThreads.remove(vmId + dbName);
                 }
-            }
+            }*/
         }
     }
 
@@ -355,7 +366,7 @@ public class QoSDBCService extends Thread {
             }
         }
         Thread thread = new Thread(new UpdateLogThread(temp, this.logConnection, dbName));
-        thread.setPriority(MAX_PRIORITY);
+        this.loggingThreadMap.get(dbName).add(thread);
         return thread;
     }
 
@@ -394,5 +405,21 @@ public class QoSDBCService extends Thread {
         }
         Thread thread = new Thread(new UpdateReplicaSyncLogThread(temp, this.logConnection, dbName));
         return thread;
+    }
+
+    public void finishAllLoggingByNow(String dbName) {
+        OutputMessage.println("[finishAllLoggingByNow] START");
+        for(Thread t : loggingThreadMap.get(dbName)) {
+            if (t != null) {
+                if (t.getState() == Thread.State.RUNNABLE) {
+                    try {
+                        t.join();
+                    } catch (InterruptedException e) {
+                        OutputMessage.println("[finishAllLoggingByNow] ERROR: " + e.getMessage());
+                    }
+                }
+            }
+        }
+        OutputMessage.println("[finishAllLoggingByNow] FINISH");
     }
 }

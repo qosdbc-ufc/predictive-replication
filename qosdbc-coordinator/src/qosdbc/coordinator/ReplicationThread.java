@@ -143,6 +143,7 @@ public class ReplicationThread extends Thread {
             /* Pause all connection proxies of the database - End */
 
             /* Generate dump database file in source agent - Begin */
+            this.qosdbcService.finishAllLoggingByNow(databaseName);
             Thread t = this.qosdbcService.flushTempLogBlocking(databaseName);
             t.start();
             t.join();

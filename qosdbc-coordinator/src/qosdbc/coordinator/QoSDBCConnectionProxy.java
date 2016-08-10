@@ -476,13 +476,15 @@ public class QoSDBCConnectionProxy extends Thread {
               responseTimeCount++;
             lock.unlock();
 
-            long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), ((finishTime - startTime) - replicaSyncTime),
-             msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
-                    response.getAffectedRows(), flagMigration);
-            long finishLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-            if (finishLong - startLong > 30000) {
-              OutputMessage.println("[" + proxyId + "]: WARNING: Logging taking too long");
+            if (dao.getDbName().equals("tpcc")) {
+              long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+              log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), ((finishTime - startTime) - replicaSyncTime),
+                      msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
+                      response.getAffectedRows(), flagMigration);
+              long finishLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+              if (finishLong - startLong > 30000) {
+                OutputMessage.println("[" + proxyId + "]: WARNING: Logging taking too long");
+              }
             }
           }
         }

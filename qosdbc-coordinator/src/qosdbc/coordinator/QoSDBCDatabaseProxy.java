@@ -83,7 +83,7 @@ public class QoSDBCDatabaseProxy {
         try {
             connection.close();
         } catch (SQLException ex) {
-        }
+            // nothing can be done here
         }
     }
 
@@ -91,6 +91,7 @@ public class QoSDBCDatabaseProxy {
         try {
             connection.commit();
         } catch (SQLException ex) {
+            // nothing can be done here
         }
     }
 
@@ -98,6 +99,7 @@ public class QoSDBCDatabaseProxy {
         try {
             connection.rollback();
         } catch (SQLException ex) {
+            // nothing can be done here
         }
     }
 

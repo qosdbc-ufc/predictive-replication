@@ -205,7 +205,7 @@ public class QoSDBCConnectionProxy extends Thread {
         synchronized (this) { // SYNCHRONIZED
           if (pause && lastRequestWasCommitOrRollback) {
             try {
-              qosdbcLoadBalancer.getTarget(proxyId, databaseName).commit();
+              dao.commit();
               OutputMessage.println("[" + proxyId + "]: PAUSED");
               flagMigration = false;
               wait();
@@ -285,7 +285,6 @@ public class QoSDBCConnectionProxy extends Thread {
         //OutputMessage.println("[" + proxyId + "]: " + "CODE: " + msg.getCode()
         //        + " COMMAND: " + msg.getCommand() + " DATABASE: " + msg.getDatabase());
 
-        dao = qosdbcLoadBalancer.getTarget(proxyId, databaseName);
         switch (msg.getCode()) {
           case RequestCode.SQL_CONNECTION_CREATE: {
             if (dao != null && dao.isActive()) {
@@ -337,11 +336,11 @@ public class QoSDBCConnectionProxy extends Thread {
           }
           case RequestCode.SQL_RESULTSET_CREATE: {
             try {
-              /*
+
               if (dao.getConnection().getAutoCommit()) {
                 changeDAO = true;
               }
-              */
+
               // TODO(Serafim): if it returns false redirect the request to proper host
 
               startSyncReplicas = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -383,22 +382,18 @@ public class QoSDBCConnectionProxy extends Thread {
           case RequestCode.SQL_COMMIT: {
             dao.commit();
             //OutputMessage.println("[" + proxyId + "]: DAO-C: " + dao.getVmId() + "/" + dao.getDbName() + "/" + dao.getId());
-            /*
             if (!dao.getConnection().getAutoCommit()) {
               changeDAO = true;
             }
-            */
             response.setState(RequestCode.STATE_SUCCESS);
             break;
           }
           case RequestCode.SQL_ROLLBACK: {
             //OutputMessage.println("[" + proxyId + "]: " + " ROLLBACK REQUESTED ");
             dao.rollback();
-            /*
             if (!dao.getConnection().getAutoCommit()) {
               changeDAO = true;
             }
-            */
             response.setState(RequestCode.STATE_SUCCESS);
             break;
           }
@@ -531,6 +526,9 @@ public class QoSDBCConnectionProxy extends Thread {
           }
         }
         break;
+      } catch (SQLException ex) {
+        OutputMessage.println("[" + proxyId + "]: ERROR:  SQLException");
+        ex.printStackTrace();
       } // TRY
     } // WHILE
     // Close all database connections

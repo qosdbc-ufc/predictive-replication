@@ -470,7 +470,7 @@ public final class ShellCommand {
 
     public static File dumpCompleteDatabase(Database database, String username, String password) {
         File result = null;
-        String fileName = System.currentTimeMillis() + "_" + database.getName() + ".sql";
+        String fileName = System.currentTimeMillis() + "_" + database.getName() + ".gz";
         boolean success = false;
         if (getOperationSystem() == LINUX) {
             success = true;
@@ -499,8 +499,11 @@ public final class ShellCommand {
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
                         String s = null;
-                        String [] command = new String[]{"mysqldump", "-u", username, "-p" + password, database.getName(), "--result-file=" + fileName};
-                        ProcessBuilder pb = new ProcessBuilder(new String[]{"mysqldump", "-u", username, "-p" + password, database.getName(), "--result-file=" + fileName});
+                        //String [] command = new String[]{"mysqldump", "-u", username, "-p" + password, database.getName(), "--single-transaction --quick --lock-tables=false --result-file=" + fileName};
+                        ProcessBuilder pb = new ProcessBuilder(
+                                new String[]{"/bin/sh",
+                                        "-c",
+                                        "mysqldump --single-transaction --quick --lock-tables=false " + database.getName() + " | gzip > " + fileName});
                         Process p = pb.start();
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
                         BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
@@ -560,7 +563,11 @@ public final class ShellCommand {
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
                         String s = null;
-                        ProcessBuilder pb = new ProcessBuilder(new String[]{"sh", "-c", "mysql -u " + username + " -p" + password + " " + database.getName() + " < " + dumpFile.getAbsolutePath()});
+                        ProcessBuilder pb = new ProcessBuilder(
+                                new String[]{"/bin/sh",
+                                        "-c",
+                                        "gunzip < " + dumpFile.getAbsolutePath() + " | mysql -u " + username + " -p" + password + " " + database.getName()});
+                        //ProcessBuilder pb = new ProcessBuilder(new String[]{"sh", "-c", "mysql -u " + username + " -p" + password + " " + database.getName() + " < " + dumpFile.getAbsolutePath()});
                         Process p = pb.start();
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
                         BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));

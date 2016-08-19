@@ -158,6 +158,7 @@ public class QoSDBCService extends Thread {
             try {
                 Socket dbConnection = serverSocket.accept();
                 dbConnection.setTcpNoDelay(true);
+                dbConnection.setSoTimeout(20*1000);
                 QoSDBCConnectionProxy connectionProxy =
                         new QoSDBCConnectionProxy(this,
                                 dbConnection,

@@ -269,7 +269,7 @@ public class QoSDBCConnectionProxy extends Thread {
           response.setState(RequestCode.STATE_SUCCESS);
           response.build().writeDelimitedTo(outputStream);
           outputStream.flush();
-          OutputMessage.println("[" + proxyId + "]: NEW MESSAGE FAILED");
+          //OutputMessage.println("[" + proxyId + "]: NEW MESSAGE FAILED");
           continue;
         }
         if (!IsValidTenant(msg.getDatabase())) {
@@ -516,8 +516,8 @@ public class QoSDBCConnectionProxy extends Thread {
 
         // } // SYNCHRONIZED
       } catch (IOException ex) {
-        OutputMessage.println("[" + proxyId + "] ERROR: Closing proxy connection");
-        ex.printStackTrace();
+        //OutputMessage.println("[" + proxyId + "] IOException: Possible Timeout: " + ex.getMessage()); // just read next message
+        /*
         if (dbConnection != null) {
           try {
             dbConnection.close();
@@ -526,6 +526,7 @@ public class QoSDBCConnectionProxy extends Thread {
           }
         }
         break;
+        */
       } catch (SQLException ex) {
         OutputMessage.println("[" + proxyId + "]: ERROR:  SQLException");
         ex.printStackTrace();

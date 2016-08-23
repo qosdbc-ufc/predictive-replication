@@ -23,6 +23,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+
+
 /**
  *
  * @author Leonardo Oliveira Moreira
@@ -51,6 +54,7 @@ public class QoSDBCConnectionProxy extends Thread {
   private Lock lock = null;
   private Lock replicaSyncLock = null;
   private List<ReplicaSyncLogEntry> replicaSyncLogBuffer = null;
+  DescriptiveStatistics stats = new DescriptiveStatistics();
 
 
   private long responseTimeSum = 0;
@@ -442,6 +446,13 @@ public class QoSDBCConnectionProxy extends Thread {
         response.setStartTime(startTime);
         response.setFinishTime(finishTime);
 
+        long replicaSyncTime = (finishSyncReplicas - startSyncReplicas);
+        lock.lock();
+          //responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
+          responseTimeCount++;
+          stats.addValue((finishTime - startTime) - replicaSyncTime);
+        lock.unlock();
+
         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE ||
             msg.getCode() == RequestCode.SQL_RESULTSET_CREATE ||
             msg.getCode() == RequestCode.SQL_COMMIT ||
@@ -469,12 +480,9 @@ public class QoSDBCConnectionProxy extends Thread {
               }
             }
 
-            long replicaSyncTime = (finishSyncReplicas - startSyncReplicas);
+
             AddEntryToReplicaSyncLog(startSyncReplicas, databaseName, replicaSyncTime);
-            lock.lock();
-              responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
-              responseTimeCount++;
-            lock.unlock();
+
 
             if (dao.getDbName().equals("tpcc")) {
               long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -610,7 +618,10 @@ public class QoSDBCConnectionProxy extends Thread {
     double rt = 0.0;
     long sum = 0;
     long count = 0;
+    double th95 = 0;
     lock.lock();
+      th95 = stats.getPercentile(95);
+      stats.clear();
       sum = responseTimeSum;
       count = responseTimeCount;
       responseTimeSum = 0;
@@ -624,7 +635,7 @@ public class QoSDBCConnectionProxy extends Thread {
     //OutputMessage.println(databaseName + " proxuSUM: " + (double)sum + " count: " + (double)count);
     rt = (double) sum / (double) count;
 
-    return rt;
+    return th95;
   }
 
   public synchronized List<String> getTempLog() {

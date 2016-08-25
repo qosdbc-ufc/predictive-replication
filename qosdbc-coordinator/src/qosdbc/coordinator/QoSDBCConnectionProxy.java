@@ -412,6 +412,7 @@ public class QoSDBCConnectionProxy extends Thread {
             if (result == -1) {
               //@gambiarra
               result = 1; // TO DO ERROR IN CHANGE CONNECTION
+              response.setState(RequestCode.STATE_FAILURE);
               //pw.println(msg.getCommand());
               //OutputMessage.println("[" + proxyId + "]: " + "FAILURE: SQL_UPDATE << " + msg.getCommand());
             } else {
@@ -447,11 +448,15 @@ public class QoSDBCConnectionProxy extends Thread {
         response.setFinishTime(finishTime);
 
         long replicaSyncTime = (finishSyncReplicas - startSyncReplicas);
-        lock.lock();
+
+        if (response.getState() == RequestCode.STATE_SUCCESS) {
+
+          lock.lock();
           //responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
-          responseTimeCount++;
-          stats.addValue((finishTime - startTime) - replicaSyncTime);
-        lock.unlock();
+            responseTimeCount++;
+            stats.addValue((finishTime - startTime) - replicaSyncTime);
+          lock.unlock();
+        }
 
         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE ||
             msg.getCode() == RequestCode.SQL_RESULTSET_CREATE ||
@@ -618,9 +623,9 @@ public class QoSDBCConnectionProxy extends Thread {
     double rt = 0.0;
     long sum = 0;
     long count = 0;
-    double th95 = 0;
+    double mean = 0.0;
     lock.lock();
-      th95 = stats.getPercentile(95);
+      mean = stats.getMean();
       stats.clear();
       sum = responseTimeSum;
       count = responseTimeCount;
@@ -628,14 +633,14 @@ public class QoSDBCConnectionProxy extends Thread {
       responseTimeCount = 0;
     lock.unlock();
 
-    if (count == 0) {
+    if (mean == 0.0) {
       OutputMessage.println("[WARNING] " + this.databaseName + " count == 0");
       return 0.0;
     }
     //OutputMessage.println(databaseName + " proxuSUM: " + (double)sum + " count: " + (double)count);
-    rt = (double) sum / (double) count;
+    // rt = (double) sum / (double) count;
 
-    return th95;
+    return mean;
   }
 
   public synchronized List<String> getTempLog() {

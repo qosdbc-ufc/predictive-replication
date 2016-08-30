@@ -449,19 +449,21 @@ public class QoSDBCConnectionProxy extends Thread {
 
         long replicaSyncTime = (finishSyncReplicas - startSyncReplicas);
 
-        if (response.getState() == RequestCode.STATE_SUCCESS) {
-
-          lock.lock();
-          //responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
-            responseTimeCount++;
-            stats.addValue((finishTime - startTime) - replicaSyncTime);
-          lock.unlock();
-        }
-
         if (msg.getCommand() != null && (msg.getCode() == RequestCode.SQL_UPDATE ||
             msg.getCode() == RequestCode.SQL_RESULTSET_CREATE ||
             msg.getCode() == RequestCode.SQL_COMMIT ||
             msg.getCode() == RequestCode.SQL_ROLLBACK)) {
+
+          if (response.getState() == RequestCode.STATE_SUCCESS) {
+
+            lock.lock();
+            //responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
+            responseTimeCount++;
+            stats.addValue((finishTime - startTime) - replicaSyncTime);
+            lock.unlock();
+          }
+
+
           if (msg.getCode() == RequestCode.SQL_ROLLBACK) {
             try {
               Statement statement = logConnection.createStatement();
@@ -488,17 +490,15 @@ public class QoSDBCConnectionProxy extends Thread {
 
             AddEntryToReplicaSyncLog(startSyncReplicas, databaseName, replicaSyncTime);
 
-
-            if (dao.getDbName().equals("tpcc")) {
-              long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-              log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), ((finishTime - startTime) - replicaSyncTime),
-                      msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
-                      response.getAffectedRows(), flagMigration);
-              long finishLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-              if (finishLong - startLong > 30000) {
-                OutputMessage.println("[" + proxyId + "]: WARNING: Logging taking too long");
-              }
+            long startLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+            log(command, dao.getVmId(), dao.getDbName(), msg.getCode(), ((finishTime - startTime) - replicaSyncTime),
+                    msg.getSlaResponseTime(), msg.getConnectionId(), msg.getTransactionId(),
+                    response.getAffectedRows(), flagMigration);
+            long finishLong = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+            if (finishLong - startLong > 30000) {
+              OutputMessage.println("[" + proxyId + "]: WARNING: Logging taking too long");
             }
+
           }
         }
 
@@ -593,7 +593,7 @@ public class QoSDBCConnectionProxy extends Thread {
                    long connectionId, long transactionId, long affectedRows, boolean inMigration) {
 
     if (sql != null) {
-      sql = sql.replaceAll("[\']", "''");
+      //sql = sql.replaceAll("[\']", "''");
       sql = sql.replaceAll("\"", "\\\\\""); // gambiarra para wikipedia em csv
     }
 

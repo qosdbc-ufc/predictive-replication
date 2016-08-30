@@ -590,6 +590,63 @@ public final class ShellCommand {
         return success;
     }
 
+
+    public static boolean syncDatabase(Database database, String username, String password, File dumpFile) {
+        boolean success = false;
+        if (getOperationSystem() == LINUX) {
+            success = true;
+            switch (database.getType()) {
+                case DatabaseSystem.TYPE_POSTGRES: {
+                    try {
+                        String s = null;
+                        ProcessBuilder pb = new ProcessBuilder(new String[]{"psql", "-h", "localhost", "-U", username, "-d", database.getName(), "-f", dumpFile.getAbsolutePath()});
+                        Map<String, String> env = pb.environment();
+                        env.put("PGPASSWORD", password);
+                        Process p = pb.start();
+                        BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+                        s = "";
+                        while ((s = stdInput.readLine()) != null) {
+                        }
+                        while ((s = stdError.readLine()) != null) {
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
+                        }
+                    } catch (IOException e) {
+                        success = false;
+                    }
+                    break;
+                }
+                case DatabaseSystem.TYPE_MYSQL: {
+                    try {
+                        String s = null;
+                        ProcessBuilder pb = new ProcessBuilder(
+                                new String[]{"/bin/sh",
+                                        "-c",
+                                        "mysql -u " + username + " -p" + password + " --default-character-set=utf8 " + database.getName() + " < " + dumpFile.getAbsolutePath()});
+                        //ProcessBuilder pb = new ProcessBuilder(new String[]{"sh", "-c", "mysql -u " + username + " -p" + password + " " + database.getName() + " < " + dumpFile.getAbsolutePath()});
+                        Process p = pb.start();
+                        BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+                        s = "";
+                        while ((s = stdInput.readLine()) != null) {
+                        }
+                        while ((s = stdError.readLine()) != null) {
+                            OutputMessage.println(s);
+                            if (s.contains("err")) success = false;
+
+                        }
+                    } catch (IOException e) {
+                        OutputMessage.println(e.getMessage());
+                        success = false;
+                    }
+                    break;
+                }
+            }
+        }
+        return success;
+    }
+
     public static File downloadFile(String strUrl, String fileName) {
         File resultFile = null;
         OutputMessage.println("Download dump: " + strUrl + " - " + fileName);

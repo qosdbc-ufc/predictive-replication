@@ -17,7 +17,8 @@ public final class CommandCode {
     public static final int DATABASE_RESTORE = 3;
     public static final int DATABASE_DROP = 4;
     public static final int DATABASE_DUMP = 9;
-    
+    public static final int DATABASE_SYNC = 10;
+
     public static final int TERMINAL_MIGRATE = 5;
     public static final int TERMINAL_EXIT = 6;
     public static final int TERMINAL_LIST_ACTIVE_DATABASE = 7;

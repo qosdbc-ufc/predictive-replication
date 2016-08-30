@@ -59,6 +59,7 @@ public class QoSDBCAgentThread extends Thread {
             try {
                 Object message = inputStream.readObject();
                 Command command = (Command) message;
+                OutputMessage.println("Request type: " + command.getCode());
                 Return result = new Return();
                 result.setState(CommandCode.STATE_FAILURE);
                 switch (command.getCode()) {
@@ -98,6 +99,30 @@ public class QoSDBCAgentThread extends Thread {
                         dumpFile.delete();
                         break;
                     }
+
+                    case CommandCode.DATABASE_SYNC: {
+                        OutputMessage.println("DATABASE_SYNC REQUEST");
+                        String databaseName = (String) command.getParameterValue("databaseName");
+                        String username = (String) command.getParameterValue("username");
+                        String password = (String) command.getParameterValue("password");
+                        int databaseType = Integer.parseInt(String.valueOf(command.getParameterValue("databaseType")));
+                        Database database = new Database(databaseName, databaseType);
+                        /* Database restore process */
+                        OutputMessage.println("DATABASE_SYNC: dbTpe= " + databaseType + " - " + databaseName + " - " + username  + " - " + password);
+                        String dumpFileURL = (String) command.getParameterValue("syncFileUrl");
+                        OutputMessage.println("syncFile URL: " + dumpFileURL);
+                        File syncFile = ShellCommand.downloadFile(dumpFileURL, dumpFileURL.substring(dumpFileURL.lastIndexOf("/") + 1));
+                        OutputMessage.println("syncFile object = " + syncFile.getAbsolutePath());
+                        boolean dumpSuccess = ShellCommand.syncDatabase(database, username, password, syncFile);
+                        if (dumpSuccess) {
+                            result.setState(CommandCode.STATE_SUCCESS);
+                        }
+                        outputStream.writeObject(result);
+                        outputStream.reset();
+                        syncFile.delete();
+                        break;
+                    }
+
                     case CommandCode.DATABASE_DUMP: {
                         String databaseName = (String) command.getParameterValue("databaseName");
                         String username = (String) command.getParameterValue("username");

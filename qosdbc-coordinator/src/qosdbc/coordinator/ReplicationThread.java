@@ -17,6 +17,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
+import java.io.PrintWriter;
+import java.io.FileWriter;
 
 import qosdbc.commons.OutputMessage;
 import qosdbc.commons.command.Command;
@@ -147,6 +149,7 @@ public class ReplicationThread extends Thread {
             Thread t = this.qosdbcService.flushTempLogBlocking(databaseName);
             t.start();
             t.join();
+            OutputMessage.println("[" + "ReplicationThread] DONE PENDING LOG FLUSH");
             Command commandDump = new Command();
             commandDump.setCode(CommandCode.DATABASE_DUMP);
             commandDump.setParameters(hashMap);
@@ -241,19 +244,49 @@ public class ReplicationThread extends Thread {
                         + "AND db_name = '" + databaseName + "' ORDER BY time_local ASC");
                 Statement databaseStatement = databaseConnection.createStatement();
                 int count = 0;
+                //PrintWriter pw = new PrintWriter(new FileWriter("/var/www/html/qosdbc/sync.sql"));
                 while (logResultSet.next()) {
                     String sql = logResultSet.getString("sql");
-                    try {
-                        databaseStatement.addBatch(sql);
-                    } catch (SQLException ex) {
+                    //pw.println(sql+";");
+                    databaseStatement.addBatch(sql);
+                    if(count % 1000 == 0) {
+                        try {
+                            databaseStatement.executeBatch();
+                        } catch (SQLException e) {
+
+                        }
                     }
                     count++;
                 }
-                databaseStatement.executeBatch();
+                //pw.close();
+                //OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Done writing sync file\n");
+                try {
+                    databaseStatement.executeBatch();
+                } catch (SQLException e) {
+                    
+                }
                 databaseStatement.close();
                 logResultSet.close();
                 logStatement.close();
                 databaseConnection.close();
+
+                /*
+                Command syncCommanc = new Command();
+                syncCommanc.setCode(CommandCode.DATABASE_SYNC);
+                HashMap<String, Object> hashMapSync = new HashMap<String, Object>();
+                hashMapSync.put("databaseName", databaseName);
+                hashMapSync.put("username", "root");
+                hashMapSync.put("password", "ufc123");
+                hashMapSync.put("databaseType", databaseSystem);
+                hashMapSync.put("syncFileUrl", "http://172.31.37.249/qosdbc/sync.sql");
+                syncCommanc.setParameters(hashMapSync);
+
+                outputStreamDestinationAgent.writeObject(syncCommanc);
+                outputStreamDestinationAgent.flush();
+
+                Object objectSync = inputStreamDestinationAgent.readObject();
+                Return resultSync = (Return) objectSync;
+                */
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Propagate Log Update Query Success\n");
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[OK]" + " "
@@ -264,14 +297,14 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[FAILURE]" + " "
                         + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
-            }
+            } /*catch (IOException ex) {
+                System.out.println(ex.getMessage());
+                OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Propagate Log Update Query Failure\n");
+                OutputMessage.println("[" + "ReplicationThread_" + this.getId()
+                        + "]: Propagate Log Update Query " + "[FAILURE]" + " "
+                        + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
+            }*/
 
-            
-            /* Change database connection in database proxy - Start */
-            //OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: CHANGE CONNECTION " + "START");
-            //qosdbcService.changeDatabaseConnection(databaseName);
-            //OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: CHANGE CONNECTION " + "END");
-            /* Change database connection in database proxy - End */
 
             /* Play all paused connection proxies of the database - Begin */
             OutputMessage.println("[" + "ReplicationThread_" + this.getId()
@@ -333,5 +366,15 @@ public class ReplicationThread extends Thread {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void writeFile3() throws IOException {
+        PrintWriter pw = new PrintWriter(new FileWriter("out.txt"));
+
+        for (int i = 0; i < 10; i++) {
+            pw.write("something");
+        }
+
+        pw.close();
     }
 }

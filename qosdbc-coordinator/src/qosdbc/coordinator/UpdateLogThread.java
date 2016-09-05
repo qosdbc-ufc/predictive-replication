@@ -44,7 +44,7 @@ public class UpdateLogThread implements Runnable {
             CopyManager copyManager = new CopyManager((BaseConnection) logConnection);
             BufferedReader reader = new BufferedReader(new FileReader(fname));
             copyManager.copyIn("COPY sql_log (\"time\", vm_id, db_name, time_local, sql, sql_type, response_time, sla_response_time, sla_violated, connection_id, transaction_id, affected_rows, in_migration)" +
-                    " FROM STDIN With csv delimiter '|' escape '\\'", reader);
+                    " FROM STDIN With csv delimiter '|'", reader);
             OutputMessage.println("[UpdateLogThread]: " + dbName + " Finished");
             reader.close();
             //File file = new File(fname);

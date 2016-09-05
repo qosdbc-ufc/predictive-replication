@@ -11,10 +11,7 @@ import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -22,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
+import qosdbc.commons.Pair;
 
 /**
  *
@@ -36,12 +34,15 @@ public class QoSDBCService extends Thread {
     private List<QoSDBCConnectionProxy> connectionProxies;
     private QoSDBCLoadBalancer qosdbcLoadBalancer = null;
     private QoSDBCForecaster qosdbcForecaster = null;
-    HashMap<String, QoSDBCForecaster> forecastingThreads = null;
-    HashMap<String, ReactiveReplicationThread> reactiveReplicThreads = null;
-    HashMap<String, QoSDBCLogger> loggerThreads = null;
+    private HashMap<String, QoSDBCForecaster> forecastingThreads = null;
+    private HashMap<String, ReactiveReplicationThread> reactiveReplicThreads = null;
+    private HashMap<String, QoSDBCLogger> loggerThreads = null;
     private boolean REACTIVE = true;
-    ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
+    private ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();
     private HashMap<String, List<Thread>>  loggingThreadMap = null;
+    private HashMap<String, Boolean> replicationGoingOnMap = null;
+    // <<dbName,VmId>, responseTime>
+    private HashMap<Pair<String, String>, Double> responseTimeMap = null;
 
     static ConsistencyService consistencyService = null;
 
@@ -56,6 +57,8 @@ public class QoSDBCService extends Thread {
         loggerThreads = new HashMap<String, QoSDBCLogger>();
         consistencyService = new ConsistencyService();
         loggingThreadMap = new HashMap<String, List<Thread>>();
+        replicationGoingOnMap = new HashMap<String, Boolean>();
+        responseTimeMap = new HashMap<Pair<String, String>, Double>();
 
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -87,7 +90,7 @@ public class QoSDBCService extends Thread {
 
                             ArrayList<Thread> loggingThreadList = new ArrayList<Thread>();
                             this.loggingThreadMap.put(dbName, loggingThreadList);
-
+                            this.replicationGoingOnMap.put(dbName, false);
                             if (REACTIVE) {
                                 ReactiveReplicationThread reactiveReplicThread = new ReactiveReplicationThread(createConnectionToLog(),
                                         catalogConnection,
@@ -422,5 +425,15 @@ public class QoSDBCService extends Thread {
             }
         }
         OutputMessage.println("[finishAllLoggingByNow] FINISH");
+    }
+
+    public boolean IsDbUnderReplication(String dbName) {
+        if(!replicationGoingOnMap.containsKey(dbName)) return false;
+        return replicationGoingOnMap.get(dbName);
+    }
+
+    public void setDbReplicationStatus(String dbName, boolean isReplicating) {
+        if(!replicationGoingOnMap.containsKey(dbName)) return;
+        replicationGoingOnMap.put(dbName, isReplicating);
     }
 }

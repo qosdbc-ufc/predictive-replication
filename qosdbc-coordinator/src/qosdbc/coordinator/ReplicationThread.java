@@ -51,6 +51,8 @@ public class ReplicationThread extends Thread {
 
     @Override
     public void run() {
+
+
         String sourceHost = (String) command.getParameterValue("sourceHost");
         String databaseName = (String) command.getParameterValue("databaseName");
         String databaseSystem = (String) command.getParameterValue("databaseSystem");
@@ -60,7 +62,9 @@ public class ReplicationThread extends Thread {
         "DatabaseName: " + databaseName + "\n" +
         "DatabaseSystem: " + databaseSystem + "\n" +
         "DestinationHost: " + destinationHost + "\n");
-        
+
+        this.qosdbcService.setDbReplicationStatus(databaseName, true);
+
         int destinationAgentPort = -1;
         int sourceAgentPort = -1;
         try {
@@ -232,8 +236,7 @@ public class ReplicationThread extends Thread {
 
             timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             try {
-                Connection databaseConnection = DriverManager.getConnection("jdbc:mysql://"
-                        + destinationHost + ":" + 3306 + "/" + databaseName, "root", "ufc123");
+
                 Statement logStatement = logConnection.createStatement();
                 ResultSet logResultSet = logStatement.executeQuery(
                         "SELECT sql "
@@ -242,7 +245,11 @@ public class ReplicationThread extends Thread {
                         + "AND (sql_type = " + RequestCode.SQL_UPDATE + " OR sql_type = "
                         + RequestCode.SQL_COMMIT + " OR sql_type = " + RequestCode.SQL_ROLLBACK + ") "
                         + "AND db_name = '" + databaseName + "' ORDER BY time_local ASC");
+
+                Connection databaseConnection = DriverManager.getConnection("jdbc:mysql://"
+                                + destinationHost + ":" + 3306 + "/" + databaseName, "root", "ufc123");
                 Statement databaseStatement = databaseConnection.createStatement();
+
                 int count = 0;
                 //PrintWriter pw = new PrintWriter(new FileWriter("/var/www/html/qosdbc/sync.sql"));
                 while (logResultSet.next()) {
@@ -252,6 +259,7 @@ public class ReplicationThread extends Thread {
                     if(count % 1000 == 0) {
                         try {
                             databaseStatement.executeBatch();
+                            databaseStatement.clearBatch();
                         } catch (SQLException e) {
 
                         }
@@ -263,12 +271,14 @@ public class ReplicationThread extends Thread {
                 try {
                     databaseStatement.executeBatch();
                 } catch (SQLException e) {
-                    
+
                 }
                 databaseStatement.close();
+                databaseConnection.close();
+
                 logResultSet.close();
                 logStatement.close();
-                databaseConnection.close();
+
 
                 /*
                 Command syncCommanc = new Command();
@@ -319,9 +329,6 @@ public class ReplicationThread extends Thread {
             /* Update database information in db_active and db_state - Begin */
             timestamp = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             try {
-                // Migrating option
-                //String sqlDbActive = "UPDATE db_active SET vm_id = '" + destinationHost + "' WHERE vm_id = '" + sourceHost + "' AND db_name = '" + databaseName + "'";
-                //String sqlDbState = "UPDATE db_state SET vm_id = '" + destinationHost + "' WHERE vm_id = '" + sourceHost + "' AND db_name = '" + databaseName + "'";
 
                 // Replication option
                 String sqlDbActiveReplica = "INSERT INTO db_active_replica (\"time\", vm_id, master) VALUES (now(), '"
@@ -329,9 +336,8 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: " + sqlDbActiveReplica);
                 Statement statement = catalogConnection.createStatement();
                 int dbActiveReplica = statement.executeUpdate(sqlDbActiveReplica);
-                this.loadBalancer.addReplica(databaseName, destinationHost);
-                // int dbState = statement.executeUpdate(sqlDbState);
                 statement.close();
+
                 if (dbActiveReplica > 0) {
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Catalog Information update - Success!\n");
                     OutputMessage.println("[" + "ReplicationThread_" + this.getId()
@@ -358,6 +364,14 @@ public class ReplicationThread extends Thread {
             long endTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
             OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                     + "]: REPLICATION TOTAL TIME " + ((endTime - startTime) / 1000) + " secs");
+
+            this.loadBalancer.addReplica(databaseName, destinationHost);
+
+            this.qosdbcService.setDbReplicationStatus(databaseName, false);
+            OutputMessage.println("[" + "ReplicationThread_" + this.getId()
+                    + "]: FINISHED REPLICATION FOR GOOD!");
+
+
         } catch (IOException ex) {
             ex.printStackTrace();
         } catch (ClassNotFoundException ex) {
@@ -368,13 +382,4 @@ public class ReplicationThread extends Thread {
         }
     }
 
-    public static void writeFile3() throws IOException {
-        PrintWriter pw = new PrintWriter(new FileWriter("out.txt"));
-
-        for (int i = 0; i < 10; i++) {
-            pw.write("something");
-        }
-
-        pw.close();
-    }
 }

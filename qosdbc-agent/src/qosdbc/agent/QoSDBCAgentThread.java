@@ -51,7 +51,7 @@ public class QoSDBCAgentThread extends Thread {
             outputStream = new ObjectOutputStream((socket.getOutputStream()));
             inputStream = new ObjectInputStream((socket.getInputStream()));
         } catch (IOException ex) {
-            OutputMessage.println("QoSDBCAgentThread: Closing client connection");
+            OutputMessage.println("QoSDBCAgentThread: Closing client connection: Error " + ex.getMessage());
             proceed = false;
         }
         OutputMessage.println("QoSDBCAgentThread started");
@@ -75,7 +75,7 @@ public class QoSDBCAgentThread extends Thread {
                             result.setState(CommandCode.STATE_SUCCESS);
                         }
                         outputStream.writeObject(result);
-                        outputStream.reset();
+                        outputStream.flush();
                         break;
                     }
                     case CommandCode.DATABASE_RESTORE: {
@@ -95,7 +95,7 @@ public class QoSDBCAgentThread extends Thread {
                             result.setState(CommandCode.STATE_SUCCESS);
                         }
                         outputStream.writeObject(result);
-                        outputStream.reset();
+                        outputStream.flush();
                         dumpFile.delete();
                         break;
                     }
@@ -118,7 +118,7 @@ public class QoSDBCAgentThread extends Thread {
                             result.setState(CommandCode.STATE_SUCCESS);
                         }
                         outputStream.writeObject(result);
-                        outputStream.reset();
+                        outputStream.flush();
                         syncFile.delete();
                         break;
                     }
@@ -132,29 +132,30 @@ public class QoSDBCAgentThread extends Thread {
                         /* Database dump process */
                         OutputMessage.println("Dump info: dbTpe= " + databaseType + " - " + databaseName + " - " + username  + " - " + password);
                         File dumpFile = null;
-                        File dest = null;
+                        //File dest = null;
                         try {
                             dumpFile = ShellCommand.dumpCompleteDatabase(database, username, password);
-                            dest = new File("/var/www/html/qosdbc");
-                            OutputMessage.println("Copying dump... " + dumpFile.getAbsolutePath() );
-                            OutputMessage.println("to " + dest.getAbsolutePath());
+                            //dest = new File("/var/www/html/qosdbc");
+                            //OutputMessage.println("Copying dump... " + dumpFile.getAbsolutePath() );
+                            //OutputMessage.println("to " + dest.getAbsolutePath());
                         }catch (Exception e) {
                             OutputMessage.println("ERROR: DD - " + e.getMessage());
                             e.printStackTrace();
                         }
+
                         if (dumpFile != null) {
-                            try {
+                            /*try {
                                 FileUtils.copyFileToDirectory(dumpFile, dest);
                             }catch (Exception e) {
                                 OutputMessage.println("ERROR: DD - " + e.getMessage());
                                 e.printStackTrace();
-                            }
-                            OutputMessage.println("Dump copied Success: " + "http://" + vmId + "/qosdbc/" + dumpFile.getName());
+                            }*/
+                            //OutputMessage.println("Dump copied Success: " + "http://" + vmId + "/qosdbc/" + dumpFile.getName());
                             result.setResultObject("http://" + vmId + "/qosdbc/" + dumpFile.getName());
                             result.setState(CommandCode.STATE_SUCCESS);
                         }
                         outputStream.writeObject(result);
-                        outputStream.reset();
+                        outputStream.flush();
                         //dumpFile.delete();
                         break;
                     }
@@ -171,7 +172,7 @@ public class QoSDBCAgentThread extends Thread {
                             OutputMessage.println("ERROR: " + "unable to remove the database");
                         }
                         outputStream.writeObject(result);
-                        outputStream.reset();
+                        outputStream.flush();
                         break;
                     }
                 }

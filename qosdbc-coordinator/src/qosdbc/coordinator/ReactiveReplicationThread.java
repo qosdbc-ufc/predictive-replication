@@ -1,6 +1,9 @@
 package qosdbc.coordinator;
 
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -8,6 +11,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +48,7 @@ public class ReactiveReplicationThread extends Thread {
     private long timeOfRt;
     private ExecutorService sqlLogExecutor = null;
     private ExecutorService replicaSyncLogExecutor = null;
-    private int warmingResponseTime = 3;
+    private int warmingResponseTime = 4;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -71,7 +75,6 @@ public class ReactiveReplicationThread extends Thread {
         double series;
         while (runThread) {
             try {
-
                 rtOutput = "";
                 // seconds to sleep
                 timeToSleep = timePeriodInSeconds - workTime;
@@ -94,10 +97,10 @@ public class ReactiveReplicationThread extends Thread {
                 }*/
                 rtOutput = "[ReactiveReplicationThread("+vmId+"/"+dbname+") Last sla: " + series + " obtained in " + (timeOfRt - query_rts_start);
                 OutputMessage.println(rtOutput);
-                if (series >= 0) {
+                if (series >= 0.0) {
 
                     if (warmingResponseTime == 0) {
-                        if (series > this.sla) {
+                        if (series > sla) {
                             violations++;
                         } else {
                             violations = 0;
@@ -105,7 +108,7 @@ public class ReactiveReplicationThread extends Thread {
 
                         if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
                             violations = 0;
-                            if (numberOfReplicas < 1) {
+                            if (numberOfReplicas < 2 && !qosdbcService.IsDbUnderReplication(dbname)) {
                                 numberOfReplicas++;
                                 createReplica();
                             }
@@ -257,7 +260,6 @@ public class ReactiveReplicationThread extends Thread {
                 qosdbcService,
                 qosdbcService.getLoadBalancer());
         replicationThread.start();
-        numberOfReplicas++;
     }
 
 
@@ -301,7 +303,6 @@ public class ReactiveReplicationThread extends Thread {
 
     public ArrayList<String> getAvailableHosts() {
         ArrayList<String> vmLists = new ArrayList<String>();
-
         String sql = "SELECT vm_id FROM vm_active";
         try {
             Statement statement = catalogConnection.createStatement();
@@ -340,5 +341,19 @@ public class ReactiveReplicationThread extends Thread {
             pauseThread = false;
             notify();
         }
+    }
+
+    private double getSLA(String dbName) {
+        Properties prop = null;
+        try {
+            prop = new Properties();
+            InputStream propInput = null;
+            String fileProperties = System.getProperty("user.dir") + System.getProperty("file.separator") + "sla.properties";
+            propInput = new FileInputStream(fileProperties);
+            prop.load(propInput);
+        } catch (IOException e) {
+            OutputMessage.println("[ReactiveReplicationThread]: " + dbname + e.getMessage());
+        }
+        return Double.parseDouble(prop.getProperty(dbName + "_sla"));
     }
 }

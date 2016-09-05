@@ -470,7 +470,7 @@ public final class ShellCommand {
 
     public static File dumpCompleteDatabase(Database database, String username, String password) {
         File result = null;
-        String fileName = System.currentTimeMillis() + "_" + database.getName() + ".gz";
+        String fileName = "/var/www/html/qosdbc/" + System.currentTimeMillis() + "_" + database.getName() + ".gz";
         boolean success = false;
         if (getOperationSystem() == LINUX) {
             success = true;
@@ -499,11 +499,13 @@ public final class ShellCommand {
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
                         String s = null;
+                        String command = "mysqldump --single-transaction --quick " + database.getName() + " | gzip > " + fileName;
                         //String [] command = new String[]{"mysqldump", "-u", username, "-p" + password, database.getName(), "--single-transaction --quick --lock-tables=false --result-file=" + fileName};
+                        OutputMessage.println("To exec: " + command);
                         ProcessBuilder pb = new ProcessBuilder(
                                 new String[]{"/bin/sh",
                                         "-c",
-                                        "mysqldump --single-transaction --quick --lock-tables=false " + database.getName() + " | gzip > " + fileName});
+                                        command});
                         Process p = pb.start();
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
                         BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
@@ -563,10 +565,12 @@ public final class ShellCommand {
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
                         String s = null;
+                        String command = "gunzip < " + dumpFile.getAbsolutePath() + " | mysql -u " + username + " -p" + password + " " + database.getName();
+                        OutputMessage.println("To exec: " + command);
                         ProcessBuilder pb = new ProcessBuilder(
                                 new String[]{"/bin/sh",
                                         "-c",
-                                        "gunzip < " + dumpFile.getAbsolutePath() + " | mysql -u " + username + " -p" + password + " " + database.getName()});
+                                        command});
                         //ProcessBuilder pb = new ProcessBuilder(new String[]{"sh", "-c", "mysql -u " + username + " -p" + password + " " + database.getName() + " < " + dumpFile.getAbsolutePath()});
                         Process p = pb.start();
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -620,10 +624,12 @@ public final class ShellCommand {
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
                         String s = null;
+                        String command = "mysql -u " + username + " -p" + password + " --default-character-set=utf8 " + database.getName() + " < " + dumpFile.getAbsolutePath();
+                        OutputMessage.println("To exec: " + command);
                         ProcessBuilder pb = new ProcessBuilder(
                                 new String[]{"/bin/sh",
                                         "-c",
-                                        "mysql -u " + username + " -p" + password + " --default-character-set=utf8 " + database.getName() + " < " + dumpFile.getAbsolutePath()});
+                                        command});
                         //ProcessBuilder pb = new ProcessBuilder(new String[]{"sh", "-c", "mysql -u " + username + " -p" + password + " " + database.getName() + " < " + dumpFile.getAbsolutePath()});
                         Process p = pb.start();
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));

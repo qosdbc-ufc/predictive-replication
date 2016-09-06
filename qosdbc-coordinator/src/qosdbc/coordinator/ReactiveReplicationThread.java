@@ -90,7 +90,8 @@ public class ReactiveReplicationThread extends Thread {
                 //OutputMessage.println("FINISH SlEEP " + dbname);
                 query_rts_start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 //OutputMessage.println("START QUERY RT " + dbname);
-                series = qosdbcService.getResponseTime(this.dbname);
+                series = qosdbcService.getResponseTime(dbname);
+                qosdbcService.resetAllTenantRTBasedOnName(dbname);
                 //OutputMessage.println("FINISH QUERY RT " + dbname);
                 timeOfRt = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 /*if (series == null) {

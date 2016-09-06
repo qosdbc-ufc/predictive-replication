@@ -483,6 +483,17 @@ public class QoSDBCService extends Thread {
         return 0d;
     }
 
+    public void resetAllTenantRTBasedOnName(String dbName) {
+        for (Map.Entry<Pair<String, String>, Double> entry : responseTimeMap.entrySet()) {
+            if(entry.getKey().getLeft().equals(dbName)) {
+                responseTimeLockMap.get(entry.getKey()).lock();
+                    responseTimeMap.put(entry.getKey(), 0d);
+                    responseTimeCountMap.put(entry.getKey(), 0);
+                responseTimeLockMap.get(entry.getKey()).unlock();
+            }
+        }
+    }
+
     public void removeReplica(String dbName) {
         qosdbcLoadBalancer.removeReplica(dbName);
     }

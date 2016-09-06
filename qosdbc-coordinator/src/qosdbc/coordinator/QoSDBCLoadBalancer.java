@@ -5,7 +5,6 @@
  */
 package qosdbc.coordinator;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -25,7 +24,7 @@ public class QoSDBCLoadBalancer {
   // dbName => Replicas
   //private static HashMap<String, List<QoSDBCDatabaseProxy>> replicasMap = null;
 
-  private AtomicBoolean addingReplica = new AtomicBoolean(false);
+  private AtomicBoolean addingOrRemovingReplica = new AtomicBoolean(false);
 
   public QoSDBCLoadBalancer(QoSDBCService qosdbcService) {
     tenantMap = new HashMap<Long, List<QoSDBCDatabaseProxy>>();
@@ -42,7 +41,7 @@ public class QoSDBCLoadBalancer {
       return null;
     }
     List<QoSDBCDatabaseProxy> connectionList = tenantMap.get(proxyId);
-    if (connectionList.size() == 1 || addingReplica.get()) {
+    if (connectionList.size() == 1 || addingOrRemovingReplica.get()) {
       targetMap.put(proxyId, 0);
       return connectionList.get(0);
     }
@@ -65,7 +64,7 @@ public class QoSDBCLoadBalancer {
       return null;
     }
     List<QoSDBCDatabaseProxy> connectionList = tenantMap.get(proxyId);
-    if (connectionList.size() == 1 || addingReplica.get()) {
+    if (connectionList.size() == 1 || addingOrRemovingReplica.get()) {
       targetMap.put(proxyId, 0);
       return connectionList.get(0);
     }
@@ -98,7 +97,7 @@ public class QoSDBCLoadBalancer {
     if (!IsValidTenant(dbName)) return;
     Iterator it = tenantMap.entrySet().iterator();
     //ArrayList<QoSDBCDatabaseProxy> connList = new ArrayList<QoSDBCDatabaseProxy>();
-    addingReplica.getAndSet(true);
+    addingOrRemovingReplica.getAndSet(true);
     while (it.hasNext()) {
       Map.Entry pair = (Map.Entry) it.next();
       List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>) pair.getValue();
@@ -115,7 +114,7 @@ public class QoSDBCLoadBalancer {
       }
     }
     QoSDBCService.consistencyService.addTenantAtHost(dbName, destinationHost);
-    addingReplica.getAndSet(false);
+    addingOrRemovingReplica.getAndSet(false);
     OutputMessage.println("[QoSDBCLoadBalancer::addReplica]: SUCCESS");
   }
 
@@ -134,13 +133,21 @@ public class QoSDBCLoadBalancer {
   }
 
   synchronized public void removeReplica(String dbName) {
-    /*if(!IsValidTenant(dbName)) return;
+    if(!IsValidTenant(dbName)) return;
     Iterator it = tenantMap.entrySet().iterator();
     while (it.hasNext()) {
       Map.Entry pair = (Map.Entry)it.next();
       List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>)pair.getValue();
-      connectionList.
-    }*/
+      if (connectionList.get(0).getDbName().equals(dbName)) {
+        if (connectionList.size() > 1) {
+          addingOrRemovingReplica.getAndSet(true);
+            QoSDBCDatabaseProxy conn = connectionList.get(connectionList.size()-1);
+            conn.close();
+            connectionList.remove(connectionList.size()-1);
+          addingOrRemovingReplica.getAndSet(false);
+        }
+      }
+    }
   }
 
 

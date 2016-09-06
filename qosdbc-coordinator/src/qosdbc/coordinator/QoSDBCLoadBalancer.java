@@ -17,6 +17,7 @@ import qosdbc.commons.OutputMessage;
  */
 public class QoSDBCLoadBalancer {
 
+  QoSDBCService qosdbcService = null;
   // proxyId => list(QoSDBCDatabaseProxy)
   private static HashMap<Long, List<QoSDBCDatabaseProxy>> tenantMap = null;
   // proxyId => currentTarget
@@ -26,9 +27,10 @@ public class QoSDBCLoadBalancer {
 
   private AtomicBoolean addingReplica = new AtomicBoolean(false);
 
-  public QoSDBCLoadBalancer() {
+  public QoSDBCLoadBalancer(QoSDBCService qosdbcService) {
     tenantMap = new HashMap<Long, List<QoSDBCDatabaseProxy>>();
     targetMap = new HashMap<Long, Integer>();
+    this.qosdbcService = qosdbcService;
     //replicasMap = new HashMap<String, List<QoSDBCDatabaseProxy>>();
   }
 
@@ -53,6 +55,31 @@ public class QoSDBCLoadBalancer {
     targetMap.put(proxyId, currentIndex); // save the one it'll be using
     //OutputMessage.println("[LoadBalancer] Chosen target: " + currentIndex);
     return connectionList.get(currentIndex);
+  }
+
+  public QoSDBCDatabaseProxy getTargetWithBestRt(long proxyId, String dbName) {
+    if (!IsValidTenant(dbName)) return null;
+    if (!tenantMap.containsKey(proxyId)) {
+      OutputMessage.println("[LoadBalancer] ERROR - There is no dbName = "
+          + dbName + " monitored. Could not get connection to it.");
+      return null;
+    }
+    List<QoSDBCDatabaseProxy> connectionList = tenantMap.get(proxyId);
+    if (connectionList.size() == 1 || addingReplica.get()) {
+      targetMap.put(proxyId, 0);
+      return connectionList.get(0);
+    }
+
+    QoSDBCDatabaseProxy bestProxy = connectionList.get(1);
+    double bestRt = 100000d;
+    for (QoSDBCDatabaseProxy proxy : connectionList) {
+      double rt = qosdbcService.getTenantRtAtVmId(dbName, proxy.getVmId());
+      if (rt < bestRt) {
+        bestRt = rt;
+        bestProxy = proxy;
+      }
+    }
+    return bestProxy;
   }
 
   synchronized public void addTenant(long proxyId, String dbName, QoSDBCDatabaseProxy conn) {

@@ -230,7 +230,7 @@ public class QoSDBCConnectionProxy extends Thread {
               boolean autoCommit = dao.getConnection().getAutoCommit();
               //OutputMessage.println("[" + proxyId + "]: changeDAO ");
               long oldDaoId = dao.getId();
-              dao = qosdbcLoadBalancer.getTarget(this.proxyId, databaseName);
+              dao = qosdbcLoadBalancer.getTargetWithBestRt(this.proxyId, databaseName);
               if (dao.getId() != oldDaoId) {
 
                 //OutputMessage.println("[" + proxyId + "]: DAO: " + dao.getVmId());
@@ -461,10 +461,11 @@ public class QoSDBCConnectionProxy extends Thread {
           if (response.getState() == RequestCode.STATE_SUCCESS) {
 
             lock.lock();
-            //responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
-            responseTimeCount++;
-            stats.addValue((finishTime - startTime) - replicaSyncTime);
+              //responseTimeSum += ((finishTime - startTime) - replicaSyncTime);
+              responseTimeCount++;
+              stats.addValue((finishTime - startTime) - replicaSyncTime);
             lock.unlock();
+            qosdbcService.updateTenantRtAtVmId(databaseName, dao.getVmId(), (finishTime - startTime) - replicaSyncTime);
           }
 
 

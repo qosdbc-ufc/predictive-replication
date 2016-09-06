@@ -211,6 +211,7 @@ public class Main {
             */ 
                         
             QoSDBCService qosdbcService = new QoSDBCService(qosdbcDbPort, catalogConnection, logConnection);
+            qosdbcService.initService();
             qosdbcService.start();
 
             QoSDBCTerminalServer terminalServer = new QoSDBCTerminalServer(terminalPort, catalogConnection, logConnection, qosdbcService);

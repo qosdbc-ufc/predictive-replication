@@ -16,6 +16,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
@@ -43,6 +45,8 @@ public class QoSDBCService extends Thread {
     private HashMap<String, Boolean> replicationGoingOnMap = null;
     // <<dbName,VmId>, responseTime>
     private HashMap<Pair<String, String>, Double> responseTimeMap = null;
+    private HashMap<Pair<String, String>, Integer> responseTimeCountMap = null;
+    private HashMap<Pair<String, String>, Lock> responseTimeLockMap = null;
 
     static ConsistencyService consistencyService = null;
 
@@ -51,7 +55,6 @@ public class QoSDBCService extends Thread {
         this.catalogConnection = catalogConnection;
         this.logConnection = logConnection;
         connectionProxies = new ArrayList<QoSDBCConnectionProxy>();
-        qosdbcLoadBalancer = new QoSDBCLoadBalancer();
         forecastingThreads = new HashMap<String, QoSDBCForecaster>();
         reactiveReplicThreads = new  HashMap<String, ReactiveReplicationThread>();
         loggerThreads = new HashMap<String, QoSDBCLogger>();
@@ -59,6 +62,8 @@ public class QoSDBCService extends Thread {
         loggingThreadMap = new HashMap<String, List<Thread>>();
         replicationGoingOnMap = new HashMap<String, Boolean>();
         responseTimeMap = new HashMap<Pair<String, String>, Double>();
+        responseTimeLockMap = new HashMap<Pair<String, String>, Lock>();
+        responseTimeCountMap = new HashMap<Pair<String, String>, Integer>();
 
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -145,6 +150,10 @@ public class QoSDBCService extends Thread {
             System.exit(0);
         }
         OutputMessage.println("The tests and creation of the databases connection were performed successfully");
+    }
+
+    public void initService() {
+        qosdbcLoadBalancer = new QoSDBCLoadBalancer(this);
     }
 
     private boolean IsValidDb(String dbName) {
@@ -435,5 +444,42 @@ public class QoSDBCService extends Thread {
     public void setDbReplicationStatus(String dbName, boolean isReplicating) {
         if(!replicationGoingOnMap.containsKey(dbName)) return;
         replicationGoingOnMap.put(dbName, isReplicating);
+    }
+
+    public void updateTenantRtAtVmId(String dbName, String vmId, double rt) {
+        Lock lock = null;
+        Pair<String, String> key = new Pair<String, String>(dbName, vmId);
+        if (!responseTimeLockMap.containsKey(key)) {
+            lock = new ReentrantLock(true);
+            responseTimeLockMap.put(key, lock);
+            responseTimeCountMap.put(key, 0);
+            responseTimeMap.put(key, 0d);
+        } else {
+            lock = responseTimeLockMap.get(key);
+        }
+
+        lock.lock();
+            double currentValue = responseTimeMap.get(key);
+            int currentCount = responseTimeCountMap.get(key);
+            currentValue =  ((currentValue * (double)currentCount) + rt) / (double)++currentCount;
+            responseTimeCountMap.put(key, currentCount);
+            responseTimeMap.put(key, currentValue);
+        lock.unlock();
+    }
+
+    public double getTenantRtAtVmId(String dbName, String vmId) {
+        Lock lock = null;
+        Pair<String, String> key = new Pair<String, String>(dbName, vmId);
+        if (responseTimeLockMap.containsKey(key)) {
+            lock = responseTimeLockMap.get(key);
+        }
+        if (lock != null) {
+            double rt = 0;
+            lock.lock();
+                rt = responseTimeMap.get(key);
+            lock.unlock();
+            return rt;
+        }
+        return 0d;
     }
 }

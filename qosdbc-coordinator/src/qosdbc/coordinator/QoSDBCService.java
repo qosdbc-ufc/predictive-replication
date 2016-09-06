@@ -482,4 +482,8 @@ public class QoSDBCService extends Thread {
         }
         return 0d;
     }
+
+    public void removeReplica(String dbName) {
+        qosdbcLoadBalancer.removeReplica(dbName);
+    }
 }

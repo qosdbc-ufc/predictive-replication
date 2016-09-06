@@ -49,6 +49,8 @@ public class ReactiveReplicationThread extends Thread {
     private ExecutorService sqlLogExecutor = null;
     private ExecutorService replicaSyncLogExecutor = null;
     private int warmingResponseTime = 4;
+    private final int MAX_NUMBER_OF_MIN_UNDER_SLA = 5;
+    private int numberOfMinutesUnderSla = 0;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -113,6 +115,16 @@ public class ReactiveReplicationThread extends Thread {
                                 createReplica();
                             }
                         }
+
+                        if (series < 0.6*sla) {
+                            numberOfMinutesUnderSla++;
+                        }
+
+                        if (shouldRemoveReplica()) {
+                            numberOfMinutesUnderSla = 0;
+                            removeReplica();
+                        }
+
                         long logSlaStart = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                         logSla(series, timeOfRt);
                         long logSlaFinish = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -355,5 +367,13 @@ public class ReactiveReplicationThread extends Thread {
             OutputMessage.println("[ReactiveReplicationThread]: " + dbname + e.getMessage());
         }
         return Double.parseDouble(prop.getProperty(dbName + "_sla"));
+    }
+
+    private boolean shouldRemoveReplica() {
+        return MAX_NUMBER_OF_MIN_UNDER_SLA == numberOfMinutesUnderSla;
+    }
+
+    private void removeReplica() {
+        qosdbcService.removeReplica(dbname);
     }
 }

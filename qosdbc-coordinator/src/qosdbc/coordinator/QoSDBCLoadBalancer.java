@@ -128,26 +128,42 @@ public class QoSDBCLoadBalancer {
         tenantMap.remove(dbName);
         OutputMessage.println("[LoadBalancer] Removing from tenantMap: " + tenantMap.size());
       }
-
     }
   }
 
-  synchronized public void removeReplica(String dbName) {
+  public void removeReplica(String dbName) {
+    OutputMessage.println("[LoadBalancer] Removing replica of " + dbName + " START");
     if(!IsValidTenant(dbName)) return;
     Iterator it = tenantMap.entrySet().iterator();
+    int tenantConectionIndex = -1;
     while (it.hasNext()) {
       Map.Entry pair = (Map.Entry)it.next();
       List<QoSDBCDatabaseProxy> connectionList = (List<QoSDBCDatabaseProxy>)pair.getValue();
       if (connectionList.get(0).getDbName().equals(dbName)) {
         if (connectionList.size() > 1) {
+
+          if (tenantConectionIndex == -1) {
+            QoSDBCDatabaseProxy bestProxy = connectionList.get(1);
+            double bestRt = 100000d;
+            for (int i = 1; i < connectionList.size(); i++) {
+              QoSDBCDatabaseProxy proxy = connectionList.get(i);
+              double rt = qosdbcService.getTenantRtAtVmId(dbName, proxy.getVmId());
+              if (rt < bestRt) {
+                bestRt = rt;
+                bestProxy = proxy;
+                tenantConectionIndex = i;
+              }
+            }
+          }
           addingOrRemovingReplica.getAndSet(true);
-            QoSDBCDatabaseProxy conn = connectionList.get(connectionList.size()-1);
+            QoSDBCDatabaseProxy conn = connectionList.get(tenantConectionIndex);
             conn.close();
-            connectionList.remove(connectionList.size()-1);
+            connectionList.remove(tenantConectionIndex);
           addingOrRemovingReplica.getAndSet(false);
         }
       }
     }
+    OutputMessage.println("[LoadBalancer] Removing replica of " + dbName + " FINISH");
   }
 
 

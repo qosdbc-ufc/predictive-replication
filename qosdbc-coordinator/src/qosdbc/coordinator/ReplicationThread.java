@@ -251,36 +251,36 @@ public class ReplicationThread extends Thread {
                 Statement databaseStatement = databaseConnection.createStatement();
 
                 int count = 0;
-                //PrintWriter pw = new PrintWriter(new FileWriter("/var/www/html/qosdbc/sync.sql"));
+                PrintWriter pw = new PrintWriter(new FileWriter("/var/www/html/qosdbc/sync.sql"));
                 while (logResultSet.next()) {
                     String sql = logResultSet.getString("sql");
-                    //pw.println(sql+";");
-                    databaseStatement.addBatch(sql);
-                    if(count % 1000 == 0) {
+                    pw.println(sql+";");
+                    //databaseStatement.addBatch(sql);
+                    /*if(count % 1000 == 0) {
                         try {
                             databaseStatement.executeBatch();
                             databaseStatement.clearBatch();
                         } catch (SQLException e) {
 
                         }
-                    }
+                    }*/
                     count++;
                 }
-                //pw.close();
-                //OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Done writing sync file\n");
-                try {
+                pw.close();
+                OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Done writing sync file\n");
+                /*try {
                     databaseStatement.executeBatch();
                 } catch (SQLException e) {
 
                 }
                 databaseStatement.close();
                 databaseConnection.close();
-
+                */
                 logResultSet.close();
                 logStatement.close();
 
 
-                /*
+
                 Command syncCommanc = new Command();
                 syncCommanc.setCode(CommandCode.DATABASE_SYNC);
                 HashMap<String, Object> hashMapSync = new HashMap<String, Object>();
@@ -296,7 +296,7 @@ public class ReplicationThread extends Thread {
 
                 Object objectSync = inputStreamDestinationAgent.readObject();
                 Return resultSync = (Return) objectSync;
-                */
+
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Propagate Log Update Query Success\n");
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[OK]" + " "
@@ -307,13 +307,13 @@ public class ReplicationThread extends Thread {
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[FAILURE]" + " "
                         + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
-            } /*catch (IOException ex) {
+            } catch (IOException ex) {
                 System.out.println(ex.getMessage());
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId() + "]: Propagate Log Update Query Failure\n");
                 OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                         + "]: Propagate Log Update Query " + "[FAILURE]" + " "
                         + ((TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - timestamp) / 1000) + " secs");
-            }*/
+            }
 
 
             /* Play all paused connection proxies of the database - Begin */

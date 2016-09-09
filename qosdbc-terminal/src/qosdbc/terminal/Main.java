@@ -11,10 +11,10 @@ import java.net.Socket;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import qosdbc.commons.command.Command;
+import qosdbc.commons.command.CommandCode;
 import qosdbc.commons.OutputMessage;
-import qosdbc.commons.data_structure.command.Command;
-import qosdbc.commons.data_structure.command.CommandCode;
-import qosdbc.commons.data_structure.command.Return;
+import qosdbc.commons.command.Return;
 import qosdbc.terminal.commands.ExitCommand;
 import qosdbc.terminal.commands.ListActiveDatabaseCommand;
 import qosdbc.terminal.commands.ListActiveVirtualMachineCommand;
@@ -147,12 +147,12 @@ public class Main {
                     switch (result.getState()) {
                         case CommandCode.STATE_SUCCESS: {
                             OutputMessage.println("The command was executed successfully");
-                            OutputMessage.println(result.getResultObject().toString(), false);
+                            //OutputMessage.println(result.getResultObject().toString(), false);
                             break;
                         }
                         case CommandCode.STATE_FAILURE: {
                             OutputMessage.println("The command was not executed successfully");
-                            OutputMessage.println(result.getResultObject().toString(), false);
+                            //OutputMessage.println(result.getResultObject().toString(), false);
                             break;
                         }
                     }

@@ -78,6 +78,7 @@ public class QoSDBCLoadBalancer {
         bestProxy = proxy;
       }
     }
+    OutputMessage.println("[LoadBalancer] " + proxyId + " picked: " + bestProxy.getId() + " > " + bestRt);
     return bestProxy;
   }
 
@@ -88,8 +89,7 @@ public class QoSDBCLoadBalancer {
       connectionList.add(conn);
       targetMap.put(proxyId, 0);
       tenantMap.put(proxyId, connectionList);
-      OutputMessage.println("[LoadBalancer] Added Tenant "
-              + proxyId);
+      OutputMessage.println("[LoadBalancer] Added Tenant " + proxyId);
     }
   }
 

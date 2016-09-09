@@ -230,7 +230,7 @@ public class QoSDBCConnectionProxy extends Thread {
               boolean autoCommit = dao.getConnection().getAutoCommit();
               //OutputMessage.println("[" + proxyId + "]: changeDAO ");
               long oldDaoId = dao.getId();
-              dao = qosdbcLoadBalancer.getTargetWithBestRt(this.proxyId, databaseName);
+              dao = qosdbcLoadBalancer.getTarget(this.proxyId, databaseName);
               if (dao.getId() != oldDaoId) {
 
                 //OutputMessage.println("[" + proxyId + "]: DAO: " + dao.getVmId());

@@ -16,8 +16,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import com.google.common.util.concurrent.AtomicDouble;
 
 import qosdbc.commons.DatabaseSystem;
 import qosdbc.commons.OutputMessage;
@@ -44,9 +46,9 @@ public class QoSDBCService extends Thread {
     private HashMap<String, List<Thread>>  loggingThreadMap = null;
     private HashMap<String, Boolean> replicationGoingOnMap = null;
     // <<dbName,VmId>, responseTime>
-    private HashMap<Pair<String, String>, Double> responseTimeMap = null;
-    private HashMap<Pair<String, String>, Integer> responseTimeCountMap = null;
-    private HashMap<Pair<String, String>, Lock> responseTimeLockMap = null;
+    private HashMap<Pair<String, String>, AtomicDouble> responseTimeMap = null;
+    private HashMap<Pair<String, String>, AtomicInteger> responseTimeCountMap = null;
+    //private HashMap<Pair<String, String>, Lock> responseTimeLockMap = null;
 
     static ConsistencyService consistencyService = null;
 
@@ -61,9 +63,9 @@ public class QoSDBCService extends Thread {
         consistencyService = new ConsistencyService();
         loggingThreadMap = new HashMap<String, List<Thread>>();
         replicationGoingOnMap = new HashMap<String, Boolean>();
-        responseTimeMap = new HashMap<Pair<String, String>, Double>();
-        responseTimeLockMap = new HashMap<Pair<String, String>, Lock>();
-        responseTimeCountMap = new HashMap<Pair<String, String>, Integer>();
+        responseTimeMap = new HashMap<Pair<String, String>, AtomicDouble>();
+        //responseTimeLockMap = new HashMap<Pair<String, String>, Lock>();
+        responseTimeCountMap = new HashMap<Pair<String, String>, AtomicInteger>();
 
         OutputMessage.println("QoSDBC Service is starting");
         try {
@@ -446,50 +448,56 @@ public class QoSDBCService extends Thread {
         replicationGoingOnMap.put(dbName, isReplicating);
     }
 
-    public void updateTenantRtAtVmId(String dbName, String vmId, double rt) {
-        Lock lock = null;
+    public synchronized void updateTenantRtAtVmId(String dbName, String vmId, double rt) {
+        //Lock lock = null;
         Pair<String, String> key = new Pair<String, String>(dbName, vmId);
-        if (!responseTimeLockMap.containsKey(key)) {
-            lock = new ReentrantLock(true);
-            responseTimeLockMap.put(key, lock);
-            responseTimeCountMap.put(key, 0);
-            responseTimeMap.put(key, 0d);
-        } else {
+        if (!responseTimeMap.containsKey(key)) {
+            //lock = new ReentrantLock(true);
+            //responseTimeLockMap.put(key, lock);
+            responseTimeCountMap.put(key, new AtomicInteger(0));
+            responseTimeMap.put(key, new AtomicDouble(0d));
+        }/* else {
             lock = responseTimeLockMap.get(key);
-        }
+        }*/
 
-        lock.lock();
-            double currentValue = responseTimeMap.get(key);
-            int currentCount = responseTimeCountMap.get(key);
-            currentValue =  ((currentValue * (double)currentCount) + rt) / (double)++currentCount;
-            responseTimeCountMap.put(key, currentCount);
-            responseTimeMap.put(key, currentValue);
-        lock.unlock();
+        //lock.lock();
+        double currentValue = responseTimeMap.get(key).get();
+        int currentCount = responseTimeCountMap.get(key).get();
+        double aux = currentCount + 1;
+        currentValue =  ((currentValue * (double)currentCount) + rt) / aux;
+        currentCount++;
+        responseTimeCountMap.get(key).set(currentCount);
+        responseTimeMap.get(key).set(currentValue);
+        //lock.unlock();
     }
 
-    public double getTenantRtAtVmId(String dbName, String vmId) {
-        Lock lock = null;
+    public synchronized double getTenantRtAtVmId(String dbName, String vmId) {
+        //Lock lock = null;
         Pair<String, String> key = new Pair<String, String>(dbName, vmId);
-        if (responseTimeLockMap.containsKey(key)) {
+        /*if (responseTimeLockMap.containsKey(key)) {
             lock = responseTimeLockMap.get(key);
         }
-        if (lock != null) {
+        if (lock != null) {*/
+        if (responseTimeMap.containsKey(key)) {
             double rt = 0;
-            lock.lock();
-                rt = responseTimeMap.get(key);
-            lock.unlock();
+          //  lock.lock();
+                rt = responseTimeMap.get(key).get();
+                OutputMessage.println("[SERVICE] " + dbName + "/" + vmId + " rt: " + rt);
+          //  lock.unlock();
             return rt;
         }
+        OutputMessage.println("[SERVICE] WARNING" + dbName + "/" + vmId + " rt: 0.0");
         return 0d;
     }
 
-    public void resetAllTenantRTBasedOnName(String dbName) {
-        for (Map.Entry<Pair<String, String>, Double> entry : responseTimeMap.entrySet()) {
+    public synchronized void resetAllTenantRTBasedOnName(String dbName) {
+        for (Map.Entry<Pair<String, String>, AtomicDouble> entry : responseTimeMap.entrySet()) {
             if(entry.getKey().getLeft().equals(dbName)) {
-                responseTimeLockMap.get(entry.getKey()).lock();
-                    responseTimeMap.put(entry.getKey(), 0d);
-                    responseTimeCountMap.put(entry.getKey(), 0);
-                responseTimeLockMap.get(entry.getKey()).unlock();
+                //responseTimeLockMap.get(entry.getKey()).lock();
+                    responseTimeMap.get(entry.getKey()).set(0d);
+                    responseTimeCountMap.get(entry.getKey()).set(0);
+                    OutputMessage.println("[SERVICE] " + dbName + " rt: RESET");
+                //responseTimeLockMap.get(entry.getKey()).unlock();
             }
         }
     }

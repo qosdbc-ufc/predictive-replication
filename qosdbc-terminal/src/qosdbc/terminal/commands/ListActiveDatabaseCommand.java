@@ -4,8 +4,8 @@
  */
 package qosdbc.terminal.commands;
 
-import qosdbc.commons.data_structure.command.Command;
-import qosdbc.commons.data_structure.command.CommandCode;
+import qosdbc.commons.command.Command;
+import qosdbc.commons.command.CommandCode;
 
 /**
  *

@@ -4,13 +4,12 @@
  */
 package qosdbc.commons;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -623,8 +622,10 @@ public final class ShellCommand {
                 }
                 case DatabaseSystem.TYPE_MYSQL: {
                     try {
+                        /*
                         String s = null;
                         String command = "mysql -u " + username + " -p" + password + " --default-character-set=utf8 " + database.getName() + " < " + dumpFile.getAbsolutePath();
+
                         OutputMessage.println("To exec: " + command);
                         ProcessBuilder pb = new ProcessBuilder(
                                 new String[]{"/bin/sh",
@@ -632,6 +633,35 @@ public final class ShellCommand {
                                         command});
                         //ProcessBuilder pb = new ProcessBuilder(new String[]{"sh", "-c", "mysql -u " + username + " -p" + password + " " + database.getName() + " < " + dumpFile.getAbsolutePath()});
                         Process p = pb.start();
+                        */
+
+                        String driverName = "com.mysql.jdbc.Driver";
+                        Class.forName(driverName);
+                        Connection databaseConnection = DriverManager.getConnection("jdbc:mysql://localhost:3306/" + database, "root", "ufc123");
+                        Statement databaseStatement = databaseConnection.createStatement();
+
+                        try (BufferedReader br = new BufferedReader(new FileReader(dumpFile))) {
+                            String line;
+                            int count = 0;
+                            while ((line = br.readLine()) != null) {
+                                try {
+                                    databaseStatement.addBatch(line);
+                                    count++;
+                                    if (count % 1000 == 0) {
+                                        databaseStatement.executeBatch();
+                                    }
+                                } catch (Exception ex) {}
+                            }
+                            try {
+                                databaseStatement.executeBatch();
+                            } catch (Exception ex) {}
+                            databaseStatement.close();
+                            databaseConnection.close();
+                        } catch (FileNotFoundException ex) {
+                            OutputMessage.println("[ShellCommand] syncDatabase: " + ex.getMessage());
+                        }
+
+                        /*
                         BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
                         BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
                         s = "";
@@ -645,6 +675,9 @@ public final class ShellCommand {
                     } catch (IOException e) {
                         OutputMessage.println(e.getMessage());
                         success = false;
+                    */
+                    } catch (Exception ex) {
+                        OutputMessage.println("[ShellCommand] syncDatabase: " + ex.getMessage());
                     }
                     break;
                 }

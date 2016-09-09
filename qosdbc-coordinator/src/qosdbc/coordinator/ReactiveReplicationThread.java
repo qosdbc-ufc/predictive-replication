@@ -48,7 +48,7 @@ public class ReactiveReplicationThread extends Thread {
     private long timeOfRt;
     private ExecutorService sqlLogExecutor = null;
     private ExecutorService replicaSyncLogExecutor = null;
-    private int warmingResponseTime = 4;
+    private int warmingResponseTime = 0;
     private final int MAX_NUMBER_OF_MIN_UNDER_SLA = 5;
     private int numberOfMinutesUnderSla = 0;
 
@@ -111,14 +111,16 @@ public class ReactiveReplicationThread extends Thread {
 
                         if (violations == MAX_NUMBER_OF_VIOLATIONS_IN_A_ROW) {
                             violations = 0;
-                            if (numberOfReplicas < 2 && !qosdbcService.IsDbUnderReplication(dbname)) {
+                            if (numberOfReplicas < 1 && !qosdbcService.IsDbUnderReplication(dbname)) {
                                 numberOfReplicas++;
                                 createReplica();
                             }
                         }
 
-                        if (series < 0.6*sla) {
+                        if (series < 0.5*sla) {
                             numberOfMinutesUnderSla++;
+                        } else {
+                            numberOfMinutesUnderSla = 0;
                         }
 
                         if (shouldRemoveReplica()) {
@@ -158,6 +160,8 @@ public class ReactiveReplicationThread extends Thread {
                     //}
                     workTime = (int)(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - query_rts_start);
                     OutputMessage.println("WORK " + this.dbname + ": " + workTime);
+                } else {
+                    logSla(0d, timeOfRt);
                 }
             } catch (InterruptedException ex) {
                 OutputMessage.println("ERROR - Error in ReactiveReplicationThread thread");
@@ -371,7 +375,7 @@ public class ReactiveReplicationThread extends Thread {
     }
 
     private boolean shouldRemoveReplica() {
-        return MAX_NUMBER_OF_MIN_UNDER_SLA == numberOfMinutesUnderSla;
+        return (MAX_NUMBER_OF_MIN_UNDER_SLA == numberOfMinutesUnderSla) && (numberOfReplicas > 0);
     }
 
     private void removeReplica() {

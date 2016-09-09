@@ -48,9 +48,9 @@ public class ReactiveReplicationThread extends Thread {
     private long timeOfRt;
     private ExecutorService sqlLogExecutor = null;
     private ExecutorService replicaSyncLogExecutor = null;
-    private int warmingResponseTime = 0;
+    private int warmingResponseTime = 4;
     private final int MAX_NUMBER_OF_MIN_UNDER_SLA = 5;
-    private int numberOfMinutesUnderSla = 0;
+    private int numberOfMinutesUnderSla = 100;
 
     public ReactiveReplicationThread(Connection logConnection,
                             Connection catalogConnection,
@@ -91,7 +91,7 @@ public class ReactiveReplicationThread extends Thread {
                 query_rts_start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 //OutputMessage.println("START QUERY RT " + dbname);
                 series = qosdbcService.getResponseTime(dbname);
-                qosdbcService.resetAllTenantRTBasedOnName(dbname);
+                //qosdbcService.resetAllTenantRTBasedOnName(dbname);
                 //OutputMessage.println("FINISH QUERY RT " + dbname);
                 timeOfRt = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 /*if (series == null) {

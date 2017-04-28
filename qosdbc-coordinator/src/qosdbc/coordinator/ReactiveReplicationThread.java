@@ -248,7 +248,9 @@ public class ReactiveReplicationThread extends Thread {
     }
 
 
-    private void createReplica() {
+    private void createReplica()
+    {
+        qosdbcService.enableLogging(dbname, true);
         String sourceHost = vmId;
         String databaseName = dbname;
         String databaseSystem = String.valueOf(DatabaseSystem.TYPE_MYSQL);

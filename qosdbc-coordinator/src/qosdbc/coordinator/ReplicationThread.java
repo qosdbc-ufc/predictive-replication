@@ -366,7 +366,7 @@ public class ReplicationThread extends Thread {
                     + "]: REPLICATION TOTAL TIME " + ((endTime - startTime) / 1000) + " secs");
 
             this.loadBalancer.addReplica(databaseName, destinationHost);
-
+            this.qosdbcService.enableLogging(databaseName, false);
             this.qosdbcService.setDbReplicationStatus(databaseName, false);
             OutputMessage.println("[" + "ReplicationThread_" + this.getId()
                     + "]: FINISHED REPLICATION FOR GOOD!");
